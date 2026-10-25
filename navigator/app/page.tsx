@@ -138,7 +138,7 @@ export default function Home() {
                         <select aria-label="Category" value={l.category} onChange={(e) => editLine(i, { category: e.target.value as BillLine["category"] })} className="rounded border border-stone-200 bg-white px-1 py-0.5">
                           {Object.entries(CAT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                         </select>
-                        {l.lowConfidence && <span className="font-semibold text-amber-800">Please check this amount</span>}
+                        {l.lowConfidence && <span className="font-semibold text-amber-800">Please check this line</span>}
                       </div>
                     </div>
                     <label className="flex items-center rounded border border-stone-300 px-2 py-1 text-right font-semibold">
