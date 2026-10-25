@@ -62,6 +62,7 @@ export default function Home() {
   const [err, setErr] = useState("");
   const [lf, setLf] = useState<LetterFields>({ patient: "", requester: "", relationship: "", contact: "" });
   const [done, setDone] = useState<Record<number, boolean>>({});
+  const [openLines, setOpenLines] = useState<Set<number>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
   const camRef = useRef<HTMLInputElement>(null);
   const t = (en: string, tl: string) => (lang === "en" ? en : tl);
@@ -136,6 +137,8 @@ export default function Home() {
   const editLine = (i: number, p: Partial<BillLine>) => setBill((b) => b && { ...b, lines: b.lines.map((l, j) => (j === i ? { ...l, ...p, lowConfidence: false } : l)) });
   const total = bill ? bill.lines.filter((l) => l.category !== "deduction").reduce((s, l) => s + l.amount, 0) : 0;
 
+  const deducted = bill ? bill.lines.filter((l) => l.category === "deduction").reduce((s, l) => s + l.amount, 0) : 0;
+
   const goStep = (n: number) => { setStep(n); window.scrollTo(0, 0); };
   const stated = bill?.total ?? 0;
   const mismatch = bill && stated > 0 && Math.abs(stated - total) > Math.max(1, stated * 0.01);
@@ -203,39 +206,44 @@ export default function Home() {
               <Seg lang={lang} setLang={saveLang} />
             </div>
 
-            <div className="card summary receipt-top">
-              <p className="receipt-title">Statement of account · read by Akop</p>
-              <div><p className="k">Hospital</p><p className="v">{bill.hospitalName}</p></div>
-              <div className="sum-row">
-                <div><p className="k">Lines add to</p><p className="v num">{peso(total)}</p></div>
-                {stated > 0 && <div><p className="k">Bill says</p><p className="v num">{peso(stated)}</p></div>}
+            <div className="bsheet">
+              <div className="bsum">
+                <p className="bsum-k">Statement of account · read by Akop</p>
+                <p className="bsum-hosp">{bill.hospitalName}</p>
+                <p className="bsum-k">{t("Lines add to", "Kabuuan ng mga linya")}</p>
+                <div className="bsum-row">
+                  <p className="bsum-v">{peso(total)}</p>
+                  {stated > 0 && (mismatch
+                    ? <span className="bsum-bad">{t("Bill says", "Sabi ng bill")} {peso(stated)} · {t("off by", "may agwat na")} {peso(Math.abs(stated - total))}</span>
+                    : <span className="bsum-ok"><StatusMark tone="success" />{t("Matches the bill", "Tugma sa bill")}</span>)}
+                </div>
+                {deducted > 0 && <p className="bsum-eq">{peso(total)} {t("costs", "gastos")} − {peso(deducted)} {t("deductions", "deduction")}</p>}
+                {mismatch && <p className="bsum-note"><i aria-hidden="true" />{t("Check for a missing or misread line.", "Tingnan kung may kulang o maling basa na linya.")}</p>}
+                {lowLines > 0 && <p className="bsum-note"><i aria-hidden="true" />{t(`${lowLines} line${lowLines > 1 ? "s need" : " needs"} a check. ${lowLines > 1 ? "They are" : "It is"} highlighted below.`, `${lowLines} linya ang kailangang tingnan. Naka-highlight sa ibaba.`)}</p>}
               </div>
-              {mismatch ? <p className="notice"><StatusMark tone="warning" />The lines and the bill total differ by {peso(Math.abs(stated - total))}. Check for a missing or misread line.</p>
-                : <p className="ok"><StatusMark tone="success" />Lines match the bill total.</p>}
-              {lowLines > 0 && <p className="notice"><StatusMark tone="warning" />{lowLines} line{lowLines > 1 ? "s" : ""} we could not read clearly. They are marked below.</p>}
-            </div>
 
-            <ul className="lines receipt-body">
-              {bill.lines.map((l, i) => (
-                <li key={i} className={`line ${l.lowConfidence ? "warn" : ""} ${l.category === "deduction" ? "deduct" : ""}`}>
-                  <div className="line-top">
-                    <input aria-label="Charge name" value={l.description} onChange={(e) => editLine(i, { description: e.target.value })} className="line-name" />
-                    <label className="amount">
-                      <span aria-hidden="true">{l.category === "deduction" ? "−₱" : "₱"}</span>
-                      <input aria-label={`Amount for ${l.description}`} inputMode="decimal" value={l.amount} onChange={(e) => editLine(i, { amount: Number(e.target.value.replace(/[^\d.]/g, "")) || 0 })} />
-                    </label>
-                  </div>
-                  <div className="line-meta">
-                    <select aria-label="Category" value={l.category} onChange={(e) => editLine(i, { category: e.target.value as BillLine["category"] })} className="chip-select">
-                      {Object.entries(CAT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                    </select>
-                    {l.lowConfidence && <span className="flag-text"><StatusMark tone="warning" />Please check this line</span>}
-                    <button className="remove" onClick={() => setBill({ ...bill, lines: bill.lines.filter((_, j) => j !== i) })}>Remove</button>
-                  </div>
-                  {l.category !== "deduction" && expl[l.description] && <p className="explain"><span className="explain-tag">{t("What this is", "Ano ito")}</span>{expl[l.description][lang]}</p>}
-                </li>
-              ))}
-            </ul>
+              {([["costs", t("Costs", "Mga gastos"), false], ["deductions", t("Deductions", "Mga deduction"), true]] as const).map(([key, label, isDed]) => {
+                const items = bill.lines.map((l, i) => ({ l, i })).filter(({ l }) => (l.category === "deduction") === isDed);
+                return (
+                  <section key={key} className={`bgrp ${key}`}>
+                    <h2 className="bgrp-h">{label}</h2>
+                    {items.length > 0 ? (
+                      <ul className="bt-list">
+                        {items.map(({ l, i }) => (
+                          <Ticket key={i} l={l} lang={lang} text={l.category !== "deduction" ? expl[l.description]?.[lang] : undefined}
+                            tag={t("What this is", "Ano ito")} open={openLines.has(i)}
+                            onToggle={() => setOpenLines((o) => { const n = new Set(o); if (n.has(i)) n.delete(i); else n.add(i); return n; })}
+                            onEdit={(p) => editLine(i, p)}
+                            onRemove={() => { setOpenLines(new Set()); setBill({ ...bill, lines: bill.lines.filter((_, j) => j !== i) }); }} />
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="bgrp-empty">{t("No deductions on this bill. Set a line’s category to Deduction and it moves here.", "Walang deduction sa bill na ito. Gawing Deduction ang category ng isang linya at lilipat ito dito.")}</p>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
             <button onClick={() => setBill({ ...bill, lines: [...bill.lines, { category: "other", description: "New charge", qty: 1, amount: 0 }] })} className="btn-ghost">+ Add a missing line</button>
 
             <div className="sticky-cta">
@@ -398,6 +406,87 @@ export default function Home() {
         )}
       </main>
     </div>
+  );
+}
+
+const CAT_SHORT: Partial<Record<BillLine["category"], string>> = { lab: "Lab", professional_fee: "Doctor’s fee" };
+
+function CatIcon({ k }: { k: BillLine["category"] }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      {k === "room" && <><path d="M3 19V6M3 14h18v5M21 14v-2.5A2.5 2.5 0 0 0 18.5 9H11v5" /><circle cx="7" cy="11" r="1.6" /></>}
+      {k === "medicine" && <><rect x="3" y="8.5" width="18" height="7" rx="3.5" transform="rotate(-35 12 12)" /><path d="M9.7 8.4l4.8 7.2" /></>}
+      {k === "lab" && <path d="M9 3h6M10 3v6l-5.2 9.2A2 2 0 0 0 6.5 21h11a2 2 0 0 0 1.7-2.8L14 9V3M7.5 15h9" />}
+      {k === "professional_fee" && <><circle cx="12" cy="8" r="3.5" /><path d="M5 20c0-4 3-6 7-6s7 2 7 6" /></>}
+      {k === "supplies" && <path d="M3 8l9-5 9 5v8l-9 5-9-5zM3 8l9 5 9-5M12 13v8" />}
+      {k === "other" && <><path d="M3 12V4h8l10 10-8 8z" /><circle cx="7.5" cy="8.5" r="1.3" /></>}
+      {k === "deduction" && <><circle cx="12" cy="12" r="9" /><path d="M8 12h8" /></>}
+    </svg>
+  );
+}
+
+// Charge names wrap on narrow phones, so this is a contentEditable span instead of an input.
+function NameField({ value, label, onCommit }: { value: string; label: string; onCommit: (v: string) => void }) {
+  return (
+    <span
+      className="bt-nm" role="textbox" aria-label={label} contentEditable="plaintext-only" suppressContentEditableWarning spellCheck={false}
+      ref={(el) => { if (el && el.textContent !== value) el.textContent = value; }}
+      onBlur={(e) => {
+        const v = (e.currentTarget.textContent ?? "").replace(/\s+/g, " ").trim();
+        if (v && v !== value) onCommit(v); else e.currentTarget.textContent = value;
+      }}
+      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } }}
+    />
+  );
+}
+
+function AmountField({ value, label, prefix, onCommit }: { value: number; label: string; prefix: string; onCommit: (n: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = draft ?? value.toLocaleString("en-PH");
+  return (
+    <label className="bt-amt">
+      <span aria-hidden="true">{prefix}</span>
+      <input inputMode="decimal" aria-label={label} value={shown} size={Math.max(4, shown.length)}
+        onFocus={() => setDraft(String(value))}
+        onChange={(e) => { setDraft(e.target.value); onCommit(Number(e.target.value.replace(/[^\d.]/g, "")) || 0); }}
+        onBlur={() => setDraft(null)} />
+    </label>
+  );
+}
+
+// One charge as a stub ticket: category stub, name, amount. The explanation opens along the bottom (hover with a mouse, tap the info button on touch).
+function Ticket({ l, text, tag, open, onToggle, onEdit, onRemove }: {
+  l: BillLine; lang: Lang; text?: string; tag: string; open: boolean; onToggle: () => void; onEdit: (p: Partial<BillLine>) => void; onRemove: () => void;
+}) {
+  const ded = l.category === "deduction";
+  return (
+    <li className={`bt${open ? " open" : ""}${l.lowConfidence ? " low" : ""}${ded ? " ded" : ""}`} data-cat={l.category}>
+      <div className="bt-stub" title="Change category">
+        <span className="bt-ico"><CatIcon k={l.category} /></span>
+        <span className="bt-lbl">{CAT_SHORT[l.category] ?? CAT[l.category]}</span>
+        <select aria-label={`Category for ${l.description}`} value={l.category} onChange={(e) => onEdit({ category: e.target.value as BillLine["category"] })}>
+          {Object.entries(CAT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <button type="button" className="bt-tool bt-rm" aria-label={`Remove ${l.description}`} title="Remove" onClick={onRemove}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+        </button>
+      </div>
+      <div className="bt-mid">
+        <div className="bt-nmrow">
+          <NameField value={l.description} label="Charge name" onCommit={(v) => onEdit({ description: v })} />
+          {text && (
+            <button type="button" className="bt-tool bt-info" aria-expanded={open} aria-label={tag} title={tag} onClick={onToggle}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
+            </button>
+          )}
+        </div>
+        {l.lowConfidence && <span className="bt-flag"><i aria-hidden="true" />Please check this line</span>}
+      </div>
+      <div className="bt-amtbox">
+        <AmountField value={l.amount} label={`Amount for ${l.description}`} prefix={ded ? "−₱" : "₱"} onCommit={(n) => onEdit({ amount: n })} />
+      </div>
+      {text && <div className="bt-strip"><div><p className="bt-why">{text}</p></div></div>}
+    </li>
   );
 }
 
