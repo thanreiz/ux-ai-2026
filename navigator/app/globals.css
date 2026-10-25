@@ -222,7 +222,7 @@ a:visited { color: #5b3c78; }
 
 /* plan */
 .scenarios { display: grid; gap: 10px; margin: 6px 0 0; padding: 0; list-style: none; }
-@media (min-width: 640px) { .scenarios { grid-template-columns: repeat(2, 1fr); } .scenario.lead { grid-column: 1 / -1; } }
+@media (min-width: 640px) { .scenarios { grid-template-columns: repeat(2, 1fr); } .scenario.lead, .scenario:nth-child(2):last-child { grid-column: 1 / -1; } }
 .scenario { border: 1px solid #dde4e1; border-radius: 16px; background: #fff; padding: 16px 18px; }
 .scenario.lead { border-color: var(--primary); background: var(--primary); color: #fff; }
 .sc-label { margin: 0; font-size: 14px; font-weight: 650; opacity: .9; }
