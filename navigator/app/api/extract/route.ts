@@ -4,6 +4,8 @@ import type { Bill } from "@/lib/types";
 import { checkCategories } from "@/lib/decide";
 import { detectFromBill } from "@/lib/detect";
 import { determineHospital } from "@/lib/hospital";
+import { isShaky, lowCount } from "@/lib/extract-utils";
+import { tooMany } from "@/lib/ratelimit";
 
 export const maxDuration = 60;
 
@@ -46,6 +48,7 @@ const PROMPT = `Transcribe this Philippine hospital Statement of Account into th
 
 export async function POST(req: Request) {
   if (!process.env.OPENAI_API_KEY) return NextResponse.json({ error: "no_key" }, { status: 503 });
+  if (tooMany(req, "extract", 6, 40)) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
   let image: string;
   try {
     ({ image } = await req.json());
@@ -72,15 +75,13 @@ export async function POST(req: Request) {
       const calc = lines.filter((l) => l.category !== "deduction").reduce((s, l) => s + l.amount, 0);
       return { hospitalName: raw.hospitalName || "Hospital", hospitalAddress: raw.hospitalAddress ?? undefined, ownershipClues: raw.ownershipClues ?? undefined, lines, total: raw.total ?? calc };
     };
-    const shaky = (b: Bill) => {
-      const calc = b.lines.filter((l) => l.category !== "deduction").reduce((s, l) => s + l.amount, 0);
-      return b.lines.filter((l) => l.lowConfidence).length >= 3 || (b.total > 0 && Math.abs(calc - b.total) > b.total * 0.01);
-    };
     let bill = await read(MODEL);
     let escalated = false;
+    let escalationTried = false;
     // One escalation to the stronger model only when the first read looks unreliable.
-    if (shaky(bill)) {
-      try { const better = await read(ESCALATE_MODEL); if (!shaky(better) || better.lines.filter((l) => l.lowConfidence).length < bill.lines.filter((l) => l.lowConfidence).length) { bill = better; escalated = true; } } catch { /* keep first read */ }
+    if (isShaky(bill)) {
+      escalationTried = true;
+      try { const better = await read(ESCALATE_MODEL); if (!isShaky(better) || lowCount(better) < lowCount(bill)) { bill = better; escalated = true; } } catch { /* keep first read */ }
     }
     // Decisions API second opinion on each line's category (drives the rules engine).
     const [d, guess] = await Promise.all([
@@ -90,7 +91,7 @@ export async function POST(req: Request) {
     if (d) bill = { ...bill, lines: d.lines };
     if (guess) bill = { ...bill, hospitalGuess: guess };
     bill = { ...bill, detected: detectFromBill(bill) };
-    return NextResponse.json({ bill, escalated, decisions: d ? { checked: d.checked, changed: d.changed } : null });
+    return NextResponse.json({ bill, escalated, escalationTried, decisions: d ? { checked: d.checked, changed: d.changed } : null });
   } catch (e) {
     console.error("extract failed", e instanceof Error ? e.message : e);
     return NextResponse.json({ error: "extract_failed" }, { status: 502 });

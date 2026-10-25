@@ -1,0 +1,53 @@
+# UX research: hospital bill and aid navigation
+
+**Research checked:** 25 October 2026. This is a pattern scan, not a clinical, legal, or benefits-rule validation. Product claims are summarized from the linked providers and should not be treated as independent audits. “What fails” below means a design limitation for this project’s context, not a claim that the reference product is defective.
+
+## Reference scan
+
+| Reference | What works | Limitation for this project | Pattern to borrow |
+|---|---|---|---|
+| [Goodbill patient service](https://www.goodbill.com/patients) and [process](https://help.goodbill.com/en/articles/237889) | Explains a staged journey: gather records, review, prepare letter, negotiate, report results. Puts an advocate and concrete next action in view. | Human negotiation takes weeks; account, authorization, and record sharing are a poor fit for a no-account, same-day navigator. | Show the full sequence and distinguish user action from agency/hospital action. |
+| [FAIR Health hospital stay estimates](https://www.fairhealthconsumer.org/insurance-basics/your-costs/estimating-costs-for-a-hospital-stay) | Breaks an estimate into included categories and explicitly calls out omitted fees. | It estimates planned US procedure costs, not an already-issued Philippine SOA or aid eligibility. | Name what the estimate includes and excludes beside the number. |
+| [Turquoise patient estimates](https://turquoise.health/patients) | Shows cost components, the method/data basis, and advises users to verify with providers. | Depends on US market/insurance data and shoppable services; provider coverage is incomplete. | State data coverage and uncertainty; keep estimate separate from final provider amount. |
+| [GetCalFresh](https://www.getcalfresh.org/en/about/) | Clear boundary between guidance and official determination; plain steps, live support, and where to apply. | Current information site does not itself process applications; its destination is an external state service. | Label “likely” as guidance and link users to the office that decides. |
+| [mRelief screener redesign](https://www.new.mrelief.com/blog/how_we_got_13_percent_to_complete_screeners) | Changed difficult exact-input questions into simpler staged yes/no choices when users could not recall precise income. | Screener patterns and thresholds are specific to a US food benefit. | Ask only decision-relevant questions, use familiar ranges, and defer exact proof to the caseworker. |
+| [GOV.UK benefit check](https://www.gov.uk/check-benefits-financial-support) | Frames a benefits check as a way to discover support and warns it is not exhaustive. | Broad landing page; not a personalized hospital-bill workflow. | Say coverage may be incomplete and use a question flow for personalized next steps. |
+| [GOV.UK question pages](https://design-system.service.gov.uk/patterns/question-pages/) | One clear question at a time, with direct labels and a strong next action. | Several one-question screens can feel slow if repeated for facts already visible on a bill. | Use one question per mobile view only for genuinely unknown facts; auto-fill and confirm extracted fields. |
+| [GOV.UK check answers](https://design-system.service.gov.uk/patterns/check-answers/) | Answers are reviewable and each can be changed without restarting the journey. | A dense review table can be hard to use on a narrow phone. | Show detected answer, source/evidence, and a large Change action inline. |
+| [GOV.UK task list](https://design-system.service.gov.uk/patterns/complete-multiple-tasks/) | Makes multi-office journeys visible and completion-oriented. | A generic list can imply all tasks are mandatory or equally urgent. | Number the suggested order; label required/conditional and explain what each office does. |
+| [GOV.UK check service suitability](https://design-system.service.gov.uk/patterns/check-a-service-is-suitable/) | Screens suitability before lengthy forms and gives a reason when a service is unsuitable. | A binary “eligible/ineligible” can overstate certainty for discretionary aid. | Use “likely / ask / not indicated” and explain the deciding condition. |
+| [GCash bill-payment support](https://help.gcash.com/hc/en-us/articles/30283132306329-Can-t-or-unable-to-pay-bills) | Troubleshooting starts with concrete checks, then branches on what the person sees; gives a safe next action. | Wallet/payment information architecture is not benefit navigation; support still requires an app and transaction lookup. | Errors should tell the user what to do now, not merely say “failed.” |
+| [Maya bill payment](https://www.maya.ph/support/bills-pay) | Clear ordered payment steps, review/confirmation, and a receipt reference. | Assumes user knows the biller/account and amount; a successful payment reference may not be an official receipt. | Provide a printable, named plan and distinguish a draft/request from an official document. |
+| [PhilHealth online services](https://www.philhealth.gov.ph/services/) | Separates member records, benefit information, and provider claim checking. | Different tasks lead to different portals or login needs; a member may not know which route answers their question. | Link a specific question to the correct office/portal and say what the link can verify. |
+| [DSWD AICS 2024 requirements](https://aics.dswd.gov.ph/wp-content/uploads/2024/09/MC-30-S-2024.pdf) | Official document requirements are organized by assistance purpose and name acceptable medical documents. | Dense circular/PDF language is difficult to act on at a hospital counter; field-office application can vary. | Translate each item into plain language, say where to get it, and retain the official source link. |
+| [PCSO Medical Access Program Citizen’s Charter](https://www.pcso.gov.ph/pcsofiles/transparency/PCSO%20Citizens%20Charter%202023%20%28rev%202024-01-24%29.pdf) | Lists different requirements for confinement, chemo, and dialysis and names source offices. | Long charter tables are not a quick mobile checklist; requirements can be purpose-specific. | Only show relevant document group, with a “bring if applicable” label and date/source. |
+| [WCAG 2.2](https://www.w3.org/TR/WCAG22/) | Normative accessibility criteria including text contrast, focus, labels, and target size minimum. | A checklist alone does not ensure usability with assistive tech or larger text. | Design semantic controls, visible focus, ≥4.5:1 body text, and ≥44px comfortable targets. |
+| [NN/g required form fields](https://www.nngroup.com/articles/required-fields/) | Highlights the memory burden of form instructions, especially when users are interrupted on mobile. | Narrow article focuses on required-field patterns, not high-stress benefits navigation. | Keep requirements visible next to the question; let people return and edit without losing progress. |
+
+## Philippine information cautions
+
+- The current [PhilHealth services page](https://www.philhealth.gov.ph/services/) links Member Portal, Case Rates Search, and provider Claims Eligibility Checking as separate services. Explain which one answers which question; do not imply that the member portal confirms a specific SOA deduction.
+- [DSWD’s AICS public page](https://www.dswd.gov.ph/aics/) says aid is temporary and crisis-based. Its current [2024 guidelines](https://aics.dswd.gov.ph/wp-content/uploads/2024/09/MC-30-S-2024.pdf) list requirements by purpose. Assessment and approval remain with DSWD.
+- [PCSO’s Citizen’s Charter](https://www.pcso.gov.ph/pcsofiles/transparency/PCSO%20Citizens%20Charter%202023%20%28rev%202024-01-24%29.pdf) identifies purpose-specific documents. Do not generalize requirements from a single category.
+- Maya and GCash examples reviewed are mainly payments and transaction support. They are not eligibility navigators. Do not copy a payment-first hierarchy into a bill-understanding task.
+- The PRD identifies ZBB and MAIFIP orders whose full texts are not yet confirmed in the existing rules. Keep their criteria marked **unverified** until the team reads the controlling official orders. Do not treat this UX research as legal verification.
+- The PRD says eGov; this scan did not verify an eGovPH hospital-aid workflow. Do not infer that eGov processes any aid application.
+
+## Design principles for the bill handler
+
+1. **Start with the bill, not an account.** Offer camera, gallery, and fictional sample immediately. No sign-in wall.
+2. **Show one useful task at a time.** Keep the flow linear and short; disclose secondary explanation and sources on demand.
+3. **Auto-fill, then ask for confirmation.** Display what the bill suggests for hospital type, room, stay setting, membership, and discount. Mark the evidence and make each field editable.
+4. **Treat OCR as a draft.** Highlight uncertain values, show the source image beside them where feasible, and never silently infer an unreadable amount.
+5. **Explain the bill in place.** Keep original line, amount, plain explanation, and any flag together. A flag prompts a question, not an accusation.
+6. **Make the math inspectable.** Show bill total → already-applied credits → estimated additional credits/range. Preserve a range where decisions/funding are unknown.
+7. **Use honest likelihood language.** “Likely,” “Ask to confirm,” and “Not indicated by these answers” are not approvals. Every program includes why, source, checked date, and open caveat.
+8. **Turn a result into the next physical action.** Order offices and documents; say where to get each document and what sentence to use at the counter.
+9. **Design for interruption.** Keep language choice and checklist ticks in browser storage only; make “continue from this screen” possible within the current tab. Offer print/save before leaving.
+10. **Use Taglish as a real parallel voice.** Keep agency/program names unchanged; explain acronyms on first use; avoid forced slang and use short familiar phrases.
+11. **Keep private data visibly local and temporary.** Explain image handling before upload and avoid patient names in demo content, logs, analytics, or printable sample output.
+12. **Design for a noisy counter and low bandwidth.** Large text, high contrast, strong primary actions, no animation dependency, text-first layout, small optimized uploads, and a sample fallback.
+
+## What this means for this project
+
+The standout interaction is **bill → checked draft → practical plan**, with deterministic eligibility rules clearly separate from AI reading/explanation. Do not add a chat interface: the user needs a fast, reviewable answer and a printable handoff. Use the 375px screen as the design target; the flow should still fit 360px with no horizontal scrolling.

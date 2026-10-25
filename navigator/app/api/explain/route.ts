@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import { tooMany } from "@/lib/ratelimit";
 
 export const maxDuration = 60;
 
@@ -24,6 +25,7 @@ const schema = {
 
 export async function POST(req: Request) {
   if (!process.env.OPENAI_API_KEY) return NextResponse.json({ error: "no_key" }, { status: 503 });
+  if (tooMany(req, "explain", 10, 80)) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
   let descriptions: string[];
   try {
     ({ descriptions } = await req.json());
