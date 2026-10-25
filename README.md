@@ -1,7 +1,7 @@
 # Akop
 
 <p align="center">
-  <img src="docs/ux/akop-logo.png" alt="Akop logo" width="120" />
+  <img src="docs/ux/akop-logo.png" alt="Akop logo" width="320" />
 </p>
 
 <p align="center">
