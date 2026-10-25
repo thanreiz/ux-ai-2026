@@ -25,11 +25,16 @@ async function shrink(file: File): Promise<string> {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
-    const s = Math.min(1, 2200 / Math.max(img.width, img.height));
-    const c = document.createElement("canvas");
-    c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
-    c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
-    return c.toDataURL("image/jpeg", 0.85);
+    // Try sharp first, then smaller, to stay under the 4.5 MB request limit on phones with big photos.
+    for (const [max, q] of [[2200, 0.85], [1800, 0.75], [1400, 0.7]] as const) {
+      const s = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+      const out = c.toDataURL("image/jpeg", q);
+      if (out.length < 3_400_000) return out;
+    }
+    throw new Error("too_big");
   } finally { URL.revokeObjectURL(url); }
 }
 
@@ -44,6 +49,7 @@ export default function Home() {
   const [lf, setLf] = useState<LetterFields>({ patient: "", requester: "", relationship: "", contact: "" });
   const [done, setDone] = useState<Record<number, boolean>>({});
   const fileRef = useRef<HTMLInputElement>(null);
+  const camRef = useRef<HTMLInputElement>(null);
   const t = (en: string, tl: string) => (lang === "en" ? en : tl);
 
   // Remember checklist ticks and language on this device only.
@@ -73,21 +79,35 @@ export default function Home() {
     setErr(""); setBill(structuredClone(SAMPLE_BILL)); setExpl(SAMPLE_EXPLANATIONS); setStep(1);
   }
 
-  async function onFile(f?: File) {
+  async function onFile(f?: File, isSample = false) {
     if (!f) return;
-    setErr(""); setBusy("Reading your bill...");
+    setErr("");
+    const steps = ["Reading your bill...", "Checking each charge...", "Checking the hospital...", "Almost done..."];
+    let n = 0; setBusy(steps[0]);
+    const timer = setInterval(() => { n = Math.min(n + 1, steps.length - 1); setBusy(steps[n]); }, 6000);
     try {
       const image = await shrink(f);
       const r = await fetch("/api/extract", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image }) });
       if (!r.ok) throw new Error(String(r.status));
       const { bill: b } = (await r.json()) as { bill: Bill };
       if (!b.lines.length) throw new Error("empty");
-      setBill(b); setExpl({}); setStep(1); setBusy("");
+      setBill(b); setExpl({}); setStep(1);
       explain(b);
     } catch {
-      setBusy("");
-      setErr("We could not read that photo. Try a clearer, flat, well-lit picture, or use the sample bill to see how it works.");
+      if (isSample) { useSample(); }
+      else setErr("We could not read that photo. Lay the bill flat in good light with every line in the frame, then try again. Or use the sample photo to see how it works.");
+    } finally {
+      clearInterval(timer); setBusy("");
+      if (fileRef.current) fileRef.current.value = "";
+      if (camRef.current) camRef.current.value = "";
     }
+  }
+
+  async function runSamplePhoto() {
+    try {
+      const blob = await (await fetch("/sample-soa.jpg")).blob();
+      await onFile(new File([blob], "sample-soa.jpg", { type: "image/jpeg" }), true);
+    } catch { useSample(); }
   }
 
   const editLine = (i: number, p: Partial<BillLine>) => setBill((b) => b && { ...b, lines: b.lines.map((l, j) => (j === i ? { ...l, ...p, lowConfidence: false } : l)) });
@@ -112,11 +132,14 @@ export default function Home() {
               <p className="text-lg text-stone-700">Take a photo of the Statement of Account. We explain each charge, check which aid programs may apply, and give you the offices and papers to bring, in order.</p>
             </div>
             <div className="space-y-3 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+              <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
-              <button onClick={() => fileRef.current?.click()} disabled={!!busy} className="w-full rounded-xl bg-teal-700 px-5 py-4 text-lg font-semibold text-white hover:bg-teal-800 disabled:opacity-60">
-                {busy || "Take or upload a photo of the bill"}
+              <button onClick={() => camRef.current?.click()} disabled={!!busy} className="w-full rounded-xl bg-teal-700 px-5 py-4 text-lg font-semibold text-white hover:bg-teal-800 disabled:opacity-60">
+                {busy || "📷 Take a photo of the bill"}
               </button>
-              <button onClick={useSample} className="w-full rounded-xl border border-stone-300 px-5 py-3 font-medium hover:bg-stone-100">Try a sample bill (fictional)</button>
+              <button onClick={() => fileRef.current?.click()} disabled={!!busy} className="w-full rounded-xl border border-stone-300 px-5 py-3 font-medium hover:bg-stone-100 disabled:opacity-60">Choose a photo from my phone or computer</button>
+              <button onClick={runSamplePhoto} disabled={!!busy} className="w-full rounded-xl border border-dashed border-teal-600 px-5 py-3 font-medium text-teal-900 hover:bg-teal-50 disabled:opacity-60">Use the sample photo (fictional bill, runs the real AI)</button>
+              <p className="text-sm text-stone-600">Tips: lay the bill flat, use good light, and keep every line and the total in the picture. The photo is not saved.</p>
               {err && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-900">{err}</p>}
             </div>
             <ul className="grid gap-3 text-sm text-stone-700 sm:grid-cols-3">
