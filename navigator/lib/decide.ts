@@ -15,30 +15,6 @@ const choices: { value: LineCategory; description: string }[] = [
   { value: "other", description: "Anything else: admission fee, oxygen, procedures, miscellaneous." },
 ];
 
-// Decisions API: what kind of hospital is this? Only trusted at high confidence; the user confirms anyway.
-export async function classifyHospital(name: string): Promise<"doh" | "lgu" | "private" | null> {
-  try {
-    const d = await new OpenAI().decisions.create({
-      model: MODEL,
-      input: name,
-      questions: [{
-        type: "choice", name: "hospital_type", instructions: "Who runs this Philippine hospital? Answer unsure if you do not clearly know.",
-        choices: [
-          { value: "doh", description: "National government hospital retained by the Department of Health, or a DOH specialty hospital." },
-          { value: "lgu", description: "Hospital run by a city, municipality or province." },
-          { value: "private", description: "Privately owned hospital, including church and corporate hospitals." },
-          { value: "unsure", description: "Not enough information to tell." },
-        ],
-      }],
-    });
-    const a = d.answers[0];
-    return a.type === "choice" && a.choice !== "unsure" && a.confidence >= 0.85 ? (a.choice as "doh" | "lgu" | "private") : null;
-  } catch (e) {
-    console.error("hospital decision failed", e instanceof Error ? e.message : e);
-    return null;
-  }
-}
-
 // Decisions API: a finite-answer question per bill line, with probabilities.
 // Sets the category used by the rules engine (e.g. professional fees vs hospital charges)
 // and flags lines the model is unsure about. Never throws; the extraction stands on failure.

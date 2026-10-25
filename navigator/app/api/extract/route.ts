@@ -1,8 +1,9 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import type { Bill } from "@/lib/types";
-import { checkCategories, classifyHospital } from "@/lib/decide";
-import { detectFromBill, matchKnownHospital } from "@/lib/detect";
+import { checkCategories } from "@/lib/decide";
+import { detectFromBill } from "@/lib/detect";
+import { determineHospital } from "@/lib/hospital";
 
 export const maxDuration = 60;
 
@@ -14,6 +15,8 @@ const schema = {
   additionalProperties: false,
   properties: {
     hospitalName: { type: "string" },
+    hospitalAddress: { type: ["string", "null"] },
+    ownershipClues: { type: ["string", "null"] },
     total: { type: ["number", "null"] },
     lines: {
       type: "array",
@@ -31,13 +34,14 @@ const schema = {
       },
     },
   },
-  required: ["hospitalName", "total", "lines"],
+  required: ["hospitalName", "hospitalAddress", "ownershipClues", "total", "lines"],
 };
 
 const PROMPT = `Transcribe this Philippine hospital Statement of Account into the schema.
 - One entry per charge line. Amounts are positive PHP numbers.
 - Discounts, PhilHealth, HMO or other deductions use category "deduction" with a positive amount.
 - If a value is hard to read, set amount to null and unreadable to true. Never guess or invent amounts.
+- Also copy the hospital address and any header text that shows who runs it (for example "Department of Health", "Provincial Government", "City Government", "Inc.", "Foundation", a university or a church). Null if absent.
 - qty is 1 if not shown. total is the stated total or null.`;
 
 export async function POST(req: Request) {
@@ -66,7 +70,7 @@ export async function POST(req: Request) {
         category: l.category, description: l.description, qty: l.qty || 1, amount: l.amount ?? 0, lowConfidence: l.unreadable || l.amount === null,
       }));
       const calc = lines.filter((l) => l.category !== "deduction").reduce((s, l) => s + l.amount, 0);
-      return { hospitalName: raw.hospitalName || "Hospital", lines, total: raw.total ?? calc };
+      return { hospitalName: raw.hospitalName || "Hospital", hospitalAddress: raw.hospitalAddress ?? undefined, ownershipClues: raw.ownershipClues ?? undefined, lines, total: raw.total ?? calc };
     };
     const shaky = (b: Bill) => {
       const calc = b.lines.filter((l) => l.category !== "deduction").reduce((s, l) => s + l.amount, 0);
@@ -81,7 +85,7 @@ export async function POST(req: Request) {
     // Decisions API second opinion on each line's category (drives the rules engine).
     const [d, guess] = await Promise.all([
       checkCategories(bill.lines).catch(() => null),
-      matchKnownHospital(bill.hospitalName) ? Promise.resolve(null) : classifyHospital(bill.hospitalName),
+      determineHospital(bill),
     ]);
     if (d) bill = { ...bill, lines: d.lines };
     if (guess) bill = { ...bill, hospitalGuess: guess };

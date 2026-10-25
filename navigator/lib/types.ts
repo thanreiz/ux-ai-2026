@@ -12,8 +12,10 @@ export interface Bill {
   hospitalName: string;
   lines: BillLine[];
   total: number;
-  hospitalGuess?: "doh" | "lgu" | "private"; // Decisions API guess, only when confident
-  detected?: { hospitalType?: Answers["hospitalType"]; room?: Answers["room"]; setting?: Answers["setting"]; notes: string[] };
+  hospitalAddress?: string;
+  ownershipClues?: string; // header text such as "Provincial Government of ..." or "Inc."
+  hospitalGuess?: { type: Answers["hospitalType"]; status: "confirmed" | "likely" | "check"; evidence: string; sourceUrl?: string };
+  detected?: { hospitalType?: Answers["hospitalType"]; room?: Answers["room"]; setting?: Answers["setting"]; philhealth?: Answers["philhealth"]; category?: Answers["category"]; notes: string[] };
 }
 
 export interface Answers {
@@ -24,6 +26,7 @@ export interface Answers {
   category: "none" | "senior" | "pwd" | "minor";
   income: "low" | "middle" | "high";
   dependents: number;
+  otherCredit?: number; // optional: HMO, PhilHealth amount the family was told, other cover already granted
 }
 
 export type Status = "applies" | "likely" | "maybe" | "no";

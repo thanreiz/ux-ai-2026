@@ -18,8 +18,15 @@ export type Detected = NonNullable<Bill["detected"]>;
 export function detectFromBill(bill: Bill): Detected {
   const d: Detected = { notes: [] };
   const known = matchKnownHospital(bill.hospitalName);
-  if (known) { d.hospitalType = known; d.notes.push(`${bill.hospitalName} is on our list of DOH hospitals`); }
-  else if (bill.hospitalGuess) { d.hospitalType = bill.hospitalGuess; d.notes.push(`${bill.hospitalName} looks like a ${bill.hospitalGuess === "doh" ? "DOH" : bill.hospitalGuess === "lgu" ? "city/provincial" : "private"} hospital`); }
+  if (known) d.hospitalType = known;
+  else if (bill.hospitalGuess) d.hospitalType = bill.hospitalGuess.type;
+
+  // Deductions already on the bill reveal membership and patient category.
+  for (const l of bill.lines.filter((x) => x.category === "deduction")) {
+    if (/philhealth|phic/i.test(l.description) && l.amount > 0) { d.philhealth = "active"; d.notes.push("a PhilHealth deduction is on the bill"); }
+    if (/senior/i.test(l.description) && l.amount > 0) d.category = "senior";
+    else if (/pwd|disab/i.test(l.description) && l.amount > 0) d.category = "pwd";
+  }
 
   const roomLine = bill.lines.find((l) => l.category === "room");
   if (roomLine) {

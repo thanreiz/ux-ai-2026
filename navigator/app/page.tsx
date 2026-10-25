@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Answers, Bill, BillLine, ProgramResult, Status } from "@/lib/types";
 import { detectFromBill, type Detected } from "@/lib/detect";
 import { evaluate } from "@/lib/rules";
@@ -44,6 +44,16 @@ export default function Home() {
   const [lf, setLf] = useState<LetterFields>({ patient: "", requester: "", relationship: "", contact: "" });
   const [done, setDone] = useState<Record<number, boolean>>({});
   const fileRef = useRef<HTMLInputElement>(null);
+  const t = (en: string, tl: string) => (lang === "en" ? en : tl);
+
+  // Remember checklist ticks and language on this device only.
+  useEffect(() => {
+    try {
+      const d = localStorage.getItem("bg-done"); if (d) setDone(JSON.parse(d));
+      const l = localStorage.getItem("bg-lang"); if (l === "en" || l === "tl") setLang(l);
+    } catch { /* storage may be blocked */ }
+  }, []);
+  useEffect(() => { try { localStorage.setItem("bg-done", JSON.stringify(done)); localStorage.setItem("bg-lang", lang); } catch { /* ignore */ } }, [done, lang]);
 
   const complete = ans.hospitalType && ans.room && ans.setting && ans.philhealth && ans.category && ans.income && ans.dependents !== undefined;
   const plan = useMemo(() => (bill && complete ? evaluate(bill, ans as Answers) : null), [bill, ans, complete]);
@@ -158,7 +168,7 @@ export default function Home() {
               const det = detectFromBill(bill);
               const merged: Detected = { ...bill.detected, ...Object.fromEntries(Object.entries(det).filter(([, v]) => v !== undefined)), notes: det.notes.length ? det.notes : bill.detected?.notes ?? [] };
               setBill({ ...bill, total, detected: merged });
-              setAns({ hospitalType: merged.hospitalType, room: merged.room, setting: merged.setting, ...Object.fromEntries(Object.entries(ans).filter(([, v]) => v !== undefined)) });
+              setAns({ hospitalType: merged.hospitalType, room: merged.room, setting: merged.setting, philhealth: merged.philhealth, category: merged.category, ...Object.fromEntries(Object.entries(ans).filter(([, v]) => v !== undefined)) });
               setStep(2);
             }} className="w-full rounded-xl bg-teal-700 px-5 py-4 text-lg font-semibold text-white hover:bg-teal-800">Looks right. Next: about you</button>
           </section>
@@ -167,11 +177,11 @@ export default function Home() {
         {step === 2 && bill && (
           <section className="space-y-6">
             <div><h2 className="text-2xl font-bold">Five quick questions</h2><p className="text-stone-600">Answers stay on your phone. They decide which programs apply.</p></div>
-            <Q label="1. What kind of hospital?" hint={ans.hospitalType && ans.hospitalType === bill.detected?.hospitalType ? `Filled in from your bill (${bill.hospitalName}). Tap another answer if this is wrong.` : undefined} value={ans.hospitalType} on={(v) => setAns({ ...ans, hospitalType: v })} opts={[["doh", "DOH hospital", "Includes Heart Center, Lung Center, NKTI, PCMC"], ["lgu", "City / provincial (LGU)", ""], ["private", "Private hospital", ""]]} />
+            <Q label="1. What kind of hospital?" warn={bill.hospitalGuess?.status === "check"} hint={ans.hospitalType && ans.hospitalType === bill.detected?.hospitalType ? <HospitalHint bill={bill} /> : undefined} value={ans.hospitalType} on={(v) => setAns({ ...ans, hospitalType: v })} opts={[["doh", "DOH hospital", "Includes Heart Center, Lung Center, NKTI, PCMC"], ["lgu", "City / provincial (LGU)", ""], ["private", "Private hospital", ""]]} />
             <Q label="2. What room is the patient in?" hint={ans.room && ans.room === bill.detected?.room ? "Filled in from the room line on your bill. Tap another answer if this is wrong." : undefined} value={ans.room} on={(v) => setAns({ ...ans, room: v })} opts={[["ward", "Ward / basic", "Shared, no extra room charge"], ["private", "Semi-private or private", ""]]} />
             <Q label="Admitted or outpatient?" hint={ans.setting && ans.setting === bill.detected?.setting ? "Filled in because your bill has a room charge." : undefined} value={ans.setting} on={(v) => setAns({ ...ans, setting: v })} opts={[["inpatient", "Admitted (confined)", ""], ["outpatient", "Outpatient", "Dialysis, chemo, check-ups"]]} />
-            <Q label="3. Is the patient an active PhilHealth member?" value={ans.philhealth} on={(v) => setAns({ ...ans, philhealth: v })} opts={[["active", "Yes, active", ""], ["none", "No / not sure", ""]]} />
-            <Q label="4. Patient category" value={ans.category} on={(v) => setAns({ ...ans, category: v })} opts={[["none", "None of these", ""], ["senior", "Senior citizen (60+)", ""], ["pwd", "Person with disability", ""], ["minor", "Child under 18", ""]]} />
+            <Q label="3. Is the patient an active PhilHealth member?" hint={ans.philhealth && ans.philhealth === bill.detected?.philhealth ? "Filled in because a PhilHealth deduction is on your bill." : undefined} value={ans.philhealth} on={(v) => setAns({ ...ans, philhealth: v })} opts={[["active", "Yes, active", ""], ["none", "No / not sure", ""]]} />
+            <Q label="4. Patient category" hint={ans.category && ans.category === bill.detected?.category ? "Filled in from a discount line on your bill." : undefined} value={ans.category} on={(v) => setAns({ ...ans, category: v })} opts={[["none", "None of these", ""], ["senior", "Senior citizen (60+)", ""], ["pwd", "Person with disability", ""], ["minor", "Child under 18", ""]]} />
             <Q label="5. Household monthly income" value={ans.income} on={(v) => setAns({ ...ans, income: v })} opts={[["low", "Below ₱15,000", ""], ["middle", "₱15,000 to ₱40,000", ""], ["high", "Above ₱40,000", ""]]} />
             <fieldset>
               <legend className="mb-2 font-semibold">People who depend on this income</legend>
@@ -181,22 +191,28 @@ export default function Home() {
                 <button aria-label="More" onClick={() => setAns({ ...ans, dependents: (ans.dependents ?? 0) + 1 })} className="h-12 w-12 rounded-xl border border-stone-300 bg-white text-xl">+</button>
               </div>
             </fieldset>
-            <button disabled={!complete} onClick={() => { setStep(3); window.scrollTo(0, 0); }} className="w-full rounded-xl bg-teal-700 px-5 py-4 text-lg font-semibold text-white hover:bg-teal-800 disabled:bg-stone-300">Show my plan</button>
+            <label className="block">
+              <span className="mb-1 block font-semibold">Other amount already covered (optional)</span>
+              <span className="mb-2 block text-sm text-stone-600">HMO, or the PhilHealth amount the hospital told you, if it is not on the bill yet.</span>
+              <span className="flex w-48 items-center rounded-xl border border-stone-300 bg-white px-3 py-3"><span className="mr-1">₱</span><input inputMode="numeric" aria-label="Other amount already covered" value={ans.otherCredit ?? ""} onChange={(e) => setAns({ ...ans, otherCredit: Number(e.target.value.replace(/\D/g, "")) || undefined })} className="w-full" /></span>
+            </label>
+            <button disabled={!complete} onClick={() => { setStep(3); window.scrollTo(0, 0); }} className="w-full rounded-xl bg-teal-700 px-5 py-4 text-lg font-semibold text-white hover:bg-teal-800 disabled:bg-stone-300">{t("Show my plan", "Ipakita ang plano ko")}</button>
           </section>
         )}
 
         {step === 3 && bill && plan && (
           <section className="space-y-6">
-            <p role="note" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"><b>Estimate only.</b> Confirm every item with the hospital billing office or PhilHealth. Aid is assessed case by case and is not guaranteed.</p>
+            <div role="group" aria-label="Language" className="no-print flex justify-end print:hidden"><div className="flex overflow-hidden rounded-lg border border-stone-300 text-sm">{(["en", "tl"] as Lang[]).map((l) => <button key={l} onClick={() => setLang(l)} aria-pressed={lang === l} className={`px-3 py-2 ${lang === l ? "bg-teal-700 text-white" : "bg-white"}`}>{l === "en" ? "English" : "Taglish"}</button>)}</div></div>
+            <p role="note" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"><b>{t("Estimate only.", "Estimate lang ito.")}</b> {t("Confirm every item with the hospital billing office or PhilHealth. Aid is assessed case by case and is not guaranteed.", "Kumpirmahin ang bawat item sa billing office ng ospital o sa PhilHealth. Case by case ang assessment ng tulong at hindi ito garantisado.")}</p>
 
             <div className="rounded-2xl bg-teal-800 p-5 text-white">
-              <p className="text-sm opacity-80">You may still owe</p>
+              <p className="text-sm opacity-80">{t("You may still owe", "Baka may babayaran ka pang")}</p>
               <p className="text-3xl font-bold">{plan.remaining.min === plan.remaining.max ? peso(plan.remaining.max) : `${peso(plan.remaining.min)} to ${peso(plan.remaining.max)}`}</p>
-              <p className="mt-1 text-sm opacity-80">of {peso(total)} billed, depending on which aid is approved.</p>
+              <p className="mt-1 text-sm opacity-80">{t(`of ${peso(total)} billed, depending on which aid is approved.`, `mula sa ${peso(total)} na sinisingil, depende kung aling tulong ang maaprubahan.`)}</p>
             </div>
 
             <div>
-              <h2 className="mb-2 text-xl font-bold">How we got there</h2>
+              <h2 className="mb-2 text-xl font-bold">{t("How we got there", "Paano namin ito nakuha")}</h2>
               <ul className="space-y-1">
                 {plan.waterfall.map((w, i) => (
                   <li key={i} className="flex items-baseline justify-between rounded-lg bg-white px-3 py-2 shadow-sm">
@@ -209,18 +225,18 @@ export default function Home() {
 
             {plan.flags.length > 0 && (
               <div>
-                <h2 className="mb-2 text-xl font-bold">Ask about these on your bill</h2>
+                <h2 className="mb-2 text-xl font-bold">{t("Ask about these on your bill", "Itanong ang mga ito tungkol sa bill mo")}</h2>
                 <ul className="space-y-2">{plan.flags.map((f, i) => <li key={i} className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">{f}</li>)}</ul>
               </div>
             )}
 
             <div>
-              <h2 className="mb-2 text-xl font-bold">Programs that may help</h2>
+              <h2 className="mb-2 text-xl font-bold">{t("Programs that may help", "Mga programang puwedeng tumulong")}</h2>
               <ul className="space-y-3">{plan.programs.filter((p) => p.status !== "no").map((p) => <Program key={p.id} p={p} />)}</ul>
             </div>
 
             <div>
-              <h2 className="mb-2 text-xl font-bold">Your plan, in order</h2>
+              <h2 className="mb-2 text-xl font-bold">{t("Your plan, in order", "Ang plano mo, ayon sa pagkakasunod")}</h2>
               <ol className="space-y-3">
                 {plan.checklist.map((s) => (
                   <li key={s.order} className="rounded-xl bg-white p-4 shadow-sm">
@@ -239,13 +255,13 @@ export default function Home() {
             </div>
 
             <div className="rounded-2xl border border-teal-200 bg-teal-50 p-4">
-              <h2 className="text-lg font-bold">Know your rights</h2>
+              <h2 className="text-lg font-bold">{t("Know your rights", "Alamin ang karapatan mo")}</h2>
               <p className="mt-1 text-sm">{plan.detentionNote}</p>
-              <p className="mt-2 text-sm"><b>At the cashier, you can say:</b> “Please show me my PhilHealth deduction and give me an itemized bill. I would like to see the social worker for an assessment before I pay.”</p>
+              <p className="mt-2 text-sm"><b>{t("At the cashier, you can say:", "Sa cashier, puwede mong sabihin:")}</b> {t("“Please show me my PhilHealth deduction and give me an itemized bill. I would like to see the social worker for an assessment before I pay.”", "“Pakipakita po ang PhilHealth deduction ko at bigyan po ako ng itemized na bill. Gusto ko pong makausap ang social worker para ma-assess bago ako magbayad.”")}</p>
             </div>
 
             <div>
-              <h2 className="mb-2 text-xl font-bold">Request letter</h2>
+              <h2 className="mb-2 text-xl font-bold">{t("Request letter (English)", "Sulat ng request (English)")}</h2>
               <div className="no-print mb-2 grid gap-2 sm:grid-cols-2 print:hidden">
                 {([["patient", "Patient name"], ["requester", "Your name"], ["relationship", "Relationship (e.g. daughter)"], ["contact", "Contact number"]] as const).map(([k, ph]) => (
                   <input key={k} placeholder={ph} aria-label={ph} value={lf[k]} onChange={(e) => setLf({ ...lf, [k]: e.target.value })} className="rounded-lg border border-stone-300 bg-white px-3 py-2" />
@@ -255,8 +271,8 @@ export default function Home() {
             </div>
 
             <div className="no-print flex flex-col gap-2 sm:flex-row print:hidden">
-              <button onClick={() => window.print()} className="flex-1 rounded-xl bg-teal-700 px-5 py-4 font-semibold text-white hover:bg-teal-800">Print plan and letter</button>
-              <button onClick={() => setStep(2)} className="flex-1 rounded-xl border border-stone-300 px-5 py-4 font-medium hover:bg-stone-100">Change my answers</button>
+              <button onClick={() => window.print()} className="flex-1 rounded-xl bg-teal-700 px-5 py-4 font-semibold text-white hover:bg-teal-800">{t("Print plan and letter", "I-print ang plano at sulat")}</button>
+              <button onClick={() => setStep(2)} className="flex-1 rounded-xl border border-stone-300 px-5 py-4 font-medium hover:bg-stone-100">{t("Change my answers", "Baguhin ang sagot ko")}</button>
             </div>
           </section>
         )}
@@ -265,11 +281,11 @@ export default function Home() {
   );
 }
 
-function Q<T extends string>({ label, hint, value, on, opts }: { label: string; hint?: string; value?: T; on: (v: T) => void; opts: [T, string, string][] }) {
+function Q<T extends string>({ label, hint, warn, value, on, opts }: { label: string; hint?: React.ReactNode; warn?: boolean; value?: T; on: (v: T) => void; opts: [T, string, string][] }) {
   return (
     <fieldset>
       <legend className="mb-1 font-semibold">{label}</legend>
-      {hint && <p className="mb-2 text-sm font-medium text-teal-800">✓ {hint}</p>}
+      {hint && <p className={`mb-2 text-sm font-medium ${warn ? "text-amber-800" : "text-teal-800"}`}>{warn ? "⚠" : "✓"} {hint}</p>}
       {!hint && <div className="mb-1" />}
       <div className="grid gap-2">
         {opts.map(([v, t, sub]) => (
@@ -298,5 +314,16 @@ function Program({ p }: { p: ProgramResult }) {
         </div>
       </details>
     </li>
+  );
+}
+
+function HospitalHint({ bill }: { bill: Bill }) {
+  const g = bill.hospitalGuess;
+  if (!g) return <>Filled in from your bill ({bill.hospitalName}). Tap another answer if this is wrong.</>;
+  const lead = g.status === "confirmed" ? "Checked two ways." : g.status === "likely" ? "Our best read." : "Please double-check.";
+  return (
+    <>
+      {lead} {g.evidence} {g.sourceUrl && <a href={g.sourceUrl} target="_blank" rel="noreferrer" className="underline">Source</a>}
+    </>
   );
 }

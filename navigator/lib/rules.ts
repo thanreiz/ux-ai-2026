@@ -113,6 +113,7 @@ export function evaluate(bill: Bill, a: Answers): Plan {
     const d = meds * DISCOUNT_RATE;
     waterfall.push({ label: "Senior/PWD 20% on medicines", amount: -d, note: "Estimate" }); balance -= d;
   }
+  if (a.otherCredit && a.otherCredit > 0) { waterfall.push({ label: "Other cover you told us about", amount: -a.otherCredit }); balance -= a.otherCredit; }
   balance = Math.max(0, balance);
   const max = balance;
   let min = balance;
