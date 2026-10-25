@@ -122,8 +122,8 @@ export default function Home() {
             <svg className="brand-mark" viewBox="0 0 88 88" aria-hidden="true"><rect width="88" height="88" rx="26" fill="#075E57"/><path d="M29 19h23l12 12v37a7 7 0 0 1-7 7H29a7 7 0 0 1-7-7V26a7 7 0 0 1 7-7Z" fill="#F7F8F6"/><path d="M52 19v12h12" fill="#CBE7E1"/><path d="M32 37h17M32 46h14" stroke="#7B958D" strokeWidth="3.5" strokeLinecap="round"/><path d="m34 59 6.5 6.5L54 52" fill="none" stroke="#D99B35" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             <span className="brand-name">Bayad<span>Gabay</span></span>
           </button>
-          {step > 0 && <ol className="flex gap-1 text-xs font-medium" aria-label="Progress">
-            {["Bill", "About you", "Plan"].map((s, i) => <li key={s} className={`rounded-full px-3 py-1 ${step === i + 1 ? "bg-teal-700 text-white" : "bg-stone-100 text-stone-600"}`}>{s}</li>)}
+          {step > 0 && <ol className="flex shrink-0 gap-1 text-[11px] font-medium sm:text-xs" aria-label="Progress">
+            {["Bill", "About you", "Plan"].map((s, i) => <li key={s} className={`whitespace-nowrap rounded-full px-2 py-1 sm:px-3 ${step === i + 1 ? "bg-teal-700 text-white" : "bg-stone-100 text-stone-600"}`}>{s}</li>)}
           </ol>}
         </div>
       </header>
