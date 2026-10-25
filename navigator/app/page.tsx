@@ -117,38 +117,45 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900">
       <header className="no-print border-b border-stone-200 bg-white print:hidden">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
-          <button onClick={() => { setStep(0); }} className="text-lg font-bold text-teal-800">Bayad<span className="text-stone-900">Gabay</span></button>
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
+          <button onClick={() => { setStep(0); }} aria-label="BayadGabay home" className="brand-lockup">
+            <svg className="brand-mark" viewBox="0 0 88 88" aria-hidden="true"><rect width="88" height="88" rx="26" fill="#075E57"/><path d="M29 19h23l12 12v37a7 7 0 0 1-7 7H29a7 7 0 0 1-7-7V26a7 7 0 0 1 7-7Z" fill="#F7F8F6"/><path d="M52 19v12h12" fill="#CBE7E1"/><path d="M32 37h17M32 46h14" stroke="#7B958D" strokeWidth="3.5" strokeLinecap="round"/><path d="m34 59 6.5 6.5L54 52" fill="none" stroke="#D99B35" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <span className="brand-name">Bayad<span>Gabay</span></span>
+          </button>
           {step > 0 && <ol className="flex gap-1 text-xs font-medium" aria-label="Progress">
             {["Bill", "About you", "Plan"].map((s, i) => <li key={s} className={`rounded-full px-3 py-1 ${step === i + 1 ? "bg-teal-700 text-white" : "bg-stone-100 text-stone-600"}`}>{s}</li>)}
           </ol>}
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-6">
+      <main className="mx-auto w-full max-w-5xl px-4 py-7 sm:px-6 sm:py-10">
         {step === 0 && (
-          <section className="space-y-6">
-            <div className="space-y-3">
-              <h1 className="text-3xl font-bold leading-tight">Understand your hospital bill. Find the help you can claim.</h1>
-              <p className="text-lg text-stone-700">Take a photo of the Statement of Account. We explain each charge, check which aid programs may apply, and give you the offices and papers to bring, in order.</p>
+          <section className="landing-grid">
+            <div className="landing-copy">
+              <p className="landing-kicker">Hospital bill → clear next steps</p>
+              <h1 className="landing-title">Know what to ask about your hospital bill.</h1>
+              <p className="landing-intro">Take a photo of the Statement of Account (SOA). We’ll explain the charges, estimate what may remain, and make a step-by-step aid plan.</p>
+              <ol className="journey" aria-label="What happens next">
+                <li><span>01</span><div><b>Understand the bill</b><small>Review each charge in plain English or Taglish.</small></div></li>
+                <li><span>02</span><div><b>Check possible support</b><small>See what may apply, with the reason and source.</small></div></li>
+                <li><span>03</span><div><b>Know where to go</b><small>Get an ordered list of offices and documents.</small></div></li>
+              </ol>
             </div>
-            <div className="space-y-3 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+            <div className="capture-panel">
+              <p className="panel-label">START WITH YOUR BILL</p>
               <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
-              <button onClick={() => camRef.current?.click()} disabled={!!busy} className="w-full rounded-xl bg-teal-700 px-5 py-4 text-lg font-semibold text-white hover:bg-teal-800 disabled:opacity-60">
-                {busy || "📷 Take a photo of the bill"}
+              <button onClick={() => camRef.current?.click()} disabled={!!busy} className="capture-primary">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l1.5-2h7L17 7h3v12H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+                <span>{busy || "Take a photo of the bill"}</span>
               </button>
-              <button onClick={() => fileRef.current?.click()} disabled={!!busy} className="w-full rounded-xl border border-stone-300 px-5 py-3 font-medium hover:bg-stone-100 disabled:opacity-60">Choose a photo from my phone or computer</button>
-              <button onClick={runSamplePhoto} disabled={!!busy} className="w-full rounded-xl border border-dashed border-teal-600 px-5 py-3 font-medium text-teal-900 hover:bg-teal-50 disabled:opacity-60">Use the sample photo (fictional bill, runs the real AI)</button>
-              <p className="text-sm text-stone-600">Tips: lay the bill flat, use good light, and keep every line and the total in the picture. The photo is not saved.</p>
-              {err && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-900">{err}</p>}
+              <button onClick={() => fileRef.current?.click()} disabled={!!busy} className="capture-secondary">Choose a photo from this device</button>
+              <button onClick={runSamplePhoto} disabled={!!busy} className="sample-link">Try the fictional sample bill <span aria-hidden="true">→</span></button>
+              <p className="capture-tip">Lay the bill flat in good light. Keep every line and the total in frame.</p>
+              {err && <p role="alert" className="capture-error">{err}</p>}
+              <div className="privacy-note"><span className="privacy-dot" aria-hidden="true"/>Your photo is used to read the bill and isn’t saved on our server.</div>
             </div>
-            <ul className="grid gap-3 text-sm text-stone-700 sm:grid-cols-3">
-              <li className="rounded-xl bg-white p-4 shadow-sm"><b>AI reads and explains.</b> Plain English or Taglish.</li>
-              <li className="rounded-xl bg-white p-4 shadow-sm"><b>Plain rules decide.</b> Every result shows its source, not a chatbot guess.</li>
-              <li className="rounded-xl bg-white p-4 shadow-sm"><b>Private.</b> Nothing is saved on our server.</li>
-            </ul>
-            <p className="text-xs text-stone-500">This is an estimate tool, not legal or medical advice. Always confirm with the hospital billing office or PhilHealth. Rules come from news and agency pages and are not yet verified with the agencies.</p>
+            <p className="estimate-note"><b>Planning estimate only.</b> Aid and final balances are decided by the hospital or agency. Every result includes its source and what still needs confirmation.</p>
           </section>
         )}
 
