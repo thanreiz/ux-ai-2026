@@ -67,13 +67,17 @@ export default function Home() {
   const t = (en: string, tl: string) => (lang === "en" ? en : tl);
 
   // Remember checklist ticks and language on this device only.
+  // Restored after hydration on purpose: reading storage during render would mismatch the server HTML.
   useEffect(() => {
     try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       const d = localStorage.getItem("bg-done"); if (d) setDone(JSON.parse(d));
       const l = localStorage.getItem("bg-lang"); if (l === "en" || l === "tl") setLang(l);
     } catch { /* storage may be blocked */ }
   }, []);
-  useEffect(() => { try { localStorage.setItem("bg-done", JSON.stringify(done)); localStorage.setItem("bg-lang", lang); } catch { /* ignore */ } }, [done, lang]);
+  // Save on user action only, so the initial empty state never overwrites what was stored.
+  const saveLang = (l: Lang) => { setLang(l); try { localStorage.setItem("bg-lang", l); } catch { /* ignore */ } };
+  const saveDone = (d: Record<number, boolean>) => { setDone(d); try { localStorage.setItem("bg-done", JSON.stringify(d)); } catch { /* ignore */ } };
 
   const complete = ans.hospitalType && ans.room && ans.setting && ans.philhealth && ans.category && ans.income && ans.dependents !== undefined;
   const plan = useMemo(() => (bill && complete ? evaluate(bill, ans as Answers) : null), [bill, ans, complete]);
@@ -89,7 +93,7 @@ export default function Home() {
     } catch { /* explanations are optional; bill still works */ }
   }
 
-  function useSample() {
+  function loadSample() {
     setErr(""); setBill(structuredClone(SAMPLE_BILL)); setExpl(SAMPLE_EXPLANATIONS); setStep(1);
   }
 
@@ -111,7 +115,7 @@ export default function Home() {
       explain(b);
     } catch (e) {
       const code = e instanceof Error ? e.message : "";
-      if (isSample) { useSample(); }
+      if (isSample) { loadSample(); }
       else if (code === "not_a_bill") setErr("This photo doesn’t look like a hospital bill. Take a photo of the Statement of Account (SOA) with the charges and the total.");
       else if (code === "rate_limited") setErr("Too many photos in a short time. Please wait a minute and try again.");
       else setErr("We could not read that photo. Lay the bill flat in good light with every line in the frame, then try again. Or use the sample photo to see how it works.");
@@ -126,18 +130,13 @@ export default function Home() {
     try {
       const blob = await (await fetch("/sample-soa.jpg")).blob();
       await onFile(new File([blob], "sample-soa.jpg", { type: "image/jpeg" }), true);
-    } catch { useSample(); }
+    } catch { loadSample(); }
   }
 
   const editLine = (i: number, p: Partial<BillLine>) => setBill((b) => b && { ...b, lines: b.lines.map((l, j) => (j === i ? { ...l, ...p, lowConfidence: false } : l)) });
   const total = bill ? bill.lines.filter((l) => l.category !== "deduction").reduce((s, l) => s + l.amount, 0) : 0;
 
   const goStep = (n: number) => { setStep(n); window.scrollTo(0, 0); };
-  const Seg = () => (
-    <div role="group" aria-label="Language" className="seg no-print">
-      {(["en", "tl"] as Lang[]).map((l) => <button key={l} onClick={() => setLang(l)} aria-pressed={lang === l}>{l === "en" ? "English" : "Taglish"}</button>)}
-    </div>
-  );
   const stated = bill?.total ?? 0;
   const mismatch = bill && stated > 0 && Math.abs(stated - total) > Math.max(1, stated * 0.01);
   const lowLines = bill ? bill.lines.filter((l) => l.lowConfidence).length : 0;
@@ -201,7 +200,7 @@ export default function Home() {
                 <h1 className="h1">Here’s what we <em>read</em></h1>
                 <p className="lede">Compare with your paper bill. Tap any amount or name to fix it.</p>
               </div>
-              <Seg />
+              <Seg lang={lang} setLang={saveLang} />
             </div>
 
             <div className="card summary receipt-top">
@@ -310,7 +309,7 @@ export default function Home() {
                 <p className="eyebrow">Step 3 of 3 · {t("Your plan", "Ang plano mo")}</p>
                 <h1 className="h1">{lang === "en" ? <>What you may owe, and what to do <em>next</em></> : <>Magkano ang babayaran, at ano ang <em>susunod</em></>}</h1>
               </div>
-              <Seg />
+              <Seg lang={lang} setLang={saveLang} />
             </div>
             <p role="note" className="estimate-banner"><b>{t("Estimate only.", "Estimate lang ito.")}</b> {t("Confirm with the hospital billing office or PhilHealth. Aid is assessed case by case and is not guaranteed.", "Kumpirmahin sa billing office ng ospital o sa PhilHealth. Case by case ang assessment ng tulong at hindi ito garantisado.")}</p>
 
@@ -347,7 +346,7 @@ export default function Home() {
                       {s.bring.length > 0 && <p className="ck-bring"><b>{t("Bring", "Dalhin")}:</b> {s.bring.join(" · ")}</p>}
                       <p className="ck-covers">{t("Covers", "Sakop")}: {s.covers}</p>
                     </div>
-                    <label className="ck-box no-print"><input type="checkbox" checked={!!done[s.order]} onChange={(e) => setDone({ ...done, [s.order]: e.target.checked })} /><span className="sr-only">Done</span></label>
+                    <label className="ck-box no-print"><input type="checkbox" checked={!!done[s.order]} onChange={(e) => saveDone({ ...done, [s.order]: e.target.checked })} /><span className="sr-only">Done</span></label>
                   </li>
                 ))}
               </ol>
@@ -398,6 +397,14 @@ export default function Home() {
           </section>
         )}
       </main>
+    </div>
+  );
+}
+
+function Seg({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void }) {
+  return (
+    <div role="group" aria-label="Language" className="seg no-print">
+      {(["en", "tl"] as Lang[]).map((l) => <button key={l} onClick={() => setLang(l)} aria-pressed={lang === l}>{l === "en" ? "English" : "Taglish"}</button>)}
     </div>
   );
 }

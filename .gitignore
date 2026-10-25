@@ -1,1 +1,6 @@
 .DS_Store
+
+# local agent/tool config
+.agents/
+.taste-skill/
+skills-lock.json
