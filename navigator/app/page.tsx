@@ -16,10 +16,10 @@ const CAT: Record<BillLine["category"], string> = {
   room: "Room", medicine: "Medicine", lab: "Lab / imaging", professional_fee: "Doctor's fee", supplies: "Supplies", other: "Other", deduction: "Deduction",
 };
 const BADGE: Record<Status, { t: string; c: string }> = {
-  applies: { t: "Applies", c: "bg-emerald-100 text-emerald-900" },
-  likely: { t: "Likely", c: "bg-teal-100 text-teal-900" },
-  maybe: { t: "Maybe, ask", c: "bg-amber-100 text-amber-900" },
-  no: { t: "Does not apply", c: "bg-stone-200 text-stone-700" },
+  applies: { t: "Applies", c: "bill" },
+  likely: { t: "Likely", c: "bill" },
+  maybe: { t: "Ask to confirm", c: "check" },
+  no: { t: "Not indicated", c: "need" },
 };
 
 async function shrink(file: File): Promise<string> {
@@ -114,21 +114,37 @@ export default function Home() {
   const editLine = (i: number, p: Partial<BillLine>) => setBill((b) => b && { ...b, lines: b.lines.map((l, j) => (j === i ? { ...l, ...p, lowConfidence: false } : l)) });
   const total = bill ? bill.lines.filter((l) => l.category !== "deduction").reduce((s, l) => s + l.amount, 0) : 0;
 
+  const goStep = (n: number) => { setStep(n); window.scrollTo(0, 0); };
+  const Seg = () => (
+    <div role="group" aria-label="Language" className="seg no-print">
+      {(["en", "tl"] as Lang[]).map((l) => <button key={l} onClick={() => setLang(l)} aria-pressed={lang === l}>{l === "en" ? "English" : "Taglish"}</button>)}
+    </div>
+  );
+  const stated = bill?.total ?? 0;
+  const mismatch = bill && stated > 0 && Math.abs(stated - total) > Math.max(1, stated * 0.01);
+  const lowLines = bill ? bill.lines.filter((l) => l.lowConfidence).length : 0;
+
   return (
-    <div className="min-h-screen bg-stone-50 text-stone-900">
-      <header className="no-print border-b border-stone-200 bg-white print:hidden">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
-          <button onClick={() => { setStep(0); }} aria-label="Akop home" className="brand-lockup">
+    <div className="min-h-screen">
+      <header className="app-header no-print">
+        <div className="app-header-in">
+          <button onClick={() => goStep(0)} aria-label="Akop home" className="brand-lockup">
             <svg className="brand-mark" viewBox="0 0 88 88" aria-hidden="true"><rect width="88" height="88" rx="26" fill="#075E57"/><path d="M29 19h23l12 12v37a7 7 0 0 1-7 7H29a7 7 0 0 1-7-7V26a7 7 0 0 1 7-7Z" fill="#F7F8F6"/><path d="M52 19v12h12" fill="#CBE7E1"/><path d="M32 37h17M32 46h14" stroke="#7B958D" strokeWidth="3.5" strokeLinecap="round"/><path d="m34 59 6.5 6.5L54 52" fill="none" stroke="#D99B35" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             <span className="brand-name">Ak<span>op</span></span>
           </button>
-          {step > 0 && <ol className="flex shrink-0 gap-1 text-[11px] font-medium sm:text-xs" aria-label="Progress">
-            {["Bill", "About you", "Plan"].map((s, i) => <li key={s} className={`whitespace-nowrap rounded-full px-2 py-1 sm:px-3 ${step === i + 1 ? "bg-teal-700 text-white" : "bg-stone-100 text-stone-600"}`}>{s}</li>)}
-          </ol>}
+          {step > 0 && (
+            <ol className="stepper" aria-label="Progress">
+              {["Bill", "Details", "Plan"].map((s, i) => (
+                <li key={s} aria-current={step === i + 1 ? "step" : undefined} className={step === i + 1 ? "on" : step > i + 1 ? "done" : ""}>
+                  <span className="dot">{step > i + 1 ? "✓" : i + 1}</span><span className="lbl">{s}</span>
+                </li>
+              ))}
+            </ol>
+          )}
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-5xl px-4 py-7 sm:px-6 sm:py-10">
+      <main className={step === 0 ? "mx-auto w-full max-w-5xl px-4 py-7 sm:px-6 sm:py-10" : "page"}>
         {step === 0 && (
           <section className="landing-grid">
             <div className="landing-copy">
@@ -151,7 +167,8 @@ export default function Home() {
               </button>
               <button onClick={() => fileRef.current?.click()} disabled={!!busy} className="capture-secondary">Choose a photo from this device</button>
               <button onClick={runSamplePhoto} disabled={!!busy} className="sample-link">Try the fictional sample bill <span aria-hidden="true">→</span></button>
-              <p className="capture-tip">Lay the bill flat in good light. Keep every line and the total in frame.</p>
+              {busy && <p className="capture-tip" role="status" aria-live="polite">{busy} This takes about 10 to 20 seconds.</p>}
+              {!busy && <p className="capture-tip">Lay the bill flat in good light. Keep every line and the total in frame.</p>}
               {err && <p role="alert" className="capture-error">{err}</p>}
               <div className="privacy-note"><span className="privacy-dot" aria-hidden="true"/>Your photo is used to read the bill and isn’t saved on our server.</div>
             </div>
@@ -160,163 +177,204 @@ export default function Home() {
         )}
 
         {step === 1 && bill && (
-          <section className="space-y-4">
-            <div className="flex flex-wrap items-end justify-between gap-2">
+          <section className="stack">
+            <div className="page-head">
               <div>
-                <h2 className="text-2xl font-bold">Your bill, explained</h2>
-                <p className="text-stone-600">{bill.hospitalName}. Fix anything we misread.</p>
+                <p className="eyebrow">Step 1 of 3 · Check the bill</p>
+                <h1 className="h1">Here’s what we read</h1>
+                <p className="lede">Compare with your paper bill. Tap any amount or name to fix it.</p>
               </div>
-              <div role="group" aria-label="Language" className="flex overflow-hidden rounded-lg border border-stone-300 text-sm">
-                {(["en", "tl"] as Lang[]).map((l) => <button key={l} onClick={() => setLang(l)} aria-pressed={lang === l} className={`px-3 py-2 ${lang === l ? "bg-teal-700 text-white" : "bg-white"}`}>{l === "en" ? "English" : "Taglish"}</button>)}
-              </div>
+              <Seg />
             </div>
-            <ul className="space-y-2">
+
+            <div className="card summary">
+              <div><p className="k">Hospital</p><p className="v">{bill.hospitalName}</p></div>
+              <div className="sum-row">
+                <div><p className="k">Lines add to</p><p className="v num">{peso(total)}</p></div>
+                {stated > 0 && <div><p className="k">Bill says</p><p className="v num">{peso(stated)}</p></div>}
+              </div>
+              {mismatch ? <p className="notice">⚠ The lines and the bill total differ by {peso(Math.abs(stated - total))}. Check for a missing or misread line.</p>
+                : <p className="ok">✓ Lines match the bill total.</p>}
+              {lowLines > 0 && <p className="notice">⚠ {lowLines} line{lowLines > 1 ? "s" : ""} we could not read clearly. They are marked below.</p>}
+            </div>
+
+            <ul className="lines">
               {bill.lines.map((l, i) => (
-                <li key={i} className={`rounded-xl border bg-white p-3 shadow-sm ${l.lowConfidence ? "border-amber-400" : "border-stone-200"}`}>
-                  <div className="flex items-start gap-2">
-                    <div className="min-w-0 flex-1">
-                      <input aria-label="Description" value={l.description} onChange={(e) => editLine(i, { description: e.target.value })} className="w-full rounded border border-transparent px-1 font-medium hover:border-stone-300" />
-                      <div className="mt-1 flex items-center gap-2 text-xs text-stone-500">
-                        <select aria-label="Category" value={l.category} onChange={(e) => editLine(i, { category: e.target.value as BillLine["category"] })} className="rounded border border-stone-200 bg-white px-1 py-0.5">
-                          {Object.entries(CAT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                        </select>
-                        {l.lowConfidence && <span className="font-semibold text-amber-800">Please check this line</span>}
-                      </div>
-                    </div>
-                    <label className="flex items-center rounded border border-stone-300 px-2 py-1 text-right font-semibold">
-                      <span className="mr-1">₱</span>
-                      <input aria-label="Amount" inputMode="decimal" value={l.amount} onChange={(e) => editLine(i, { amount: Number(e.target.value.replace(/[^\d.]/g, "")) || 0 })} className="w-24 text-right" />
+                <li key={i} className={`line ${l.lowConfidence ? "warn" : ""} ${l.category === "deduction" ? "deduct" : ""}`}>
+                  <div className="line-top">
+                    <input aria-label="Charge name" value={l.description} onChange={(e) => editLine(i, { description: e.target.value })} className="line-name" />
+                    <label className="amount">
+                      <span aria-hidden="true">{l.category === "deduction" ? "−₱" : "₱"}</span>
+                      <input aria-label={`Amount for ${l.description}`} inputMode="decimal" value={l.amount} onChange={(e) => editLine(i, { amount: Number(e.target.value.replace(/[^\d.]/g, "")) || 0 })} />
                     </label>
-                    <button aria-label="Remove line" onClick={() => setBill({ ...bill, lines: bill.lines.filter((_, j) => j !== i) })} className="px-2 text-stone-400 hover:text-red-700">×</button>
                   </div>
-                  {l.category !== "deduction" && expl[l.description] && <p className="mt-2 rounded-lg bg-teal-50 p-2 text-sm text-teal-950">{expl[l.description][lang]}</p>}
+                  <div className="line-meta">
+                    <select aria-label="Category" value={l.category} onChange={(e) => editLine(i, { category: e.target.value as BillLine["category"] })} className="chip-select">
+                      {Object.entries(CAT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                    {l.lowConfidence && <span className="flag-text">⚠ Please check this line</span>}
+                    <button className="remove" onClick={() => setBill({ ...bill, lines: bill.lines.filter((_, j) => j !== i) })}>Remove</button>
+                  </div>
+                  {l.category !== "deduction" && expl[l.description] && <p className="explain"><span className="explain-tag">{t("What this is", "Ano ito")}</span>{expl[l.description][lang]}</p>}
                 </li>
               ))}
             </ul>
-            <button onClick={() => setBill({ ...bill, lines: [...bill.lines, { category: "other", description: "New charge", qty: 1, amount: 0 }] })} className="text-sm font-medium text-teal-800 underline">+ Add a line</button>
-            <div className="flex items-center justify-between rounded-xl bg-white p-4 shadow-sm"><span className="font-medium">Total charges</span><span className="text-xl font-bold">{peso(total)}</span></div>
-            <button onClick={() => {
-              const det = detectFromBill(bill);
-              const merged: Detected = { ...bill.detected, ...Object.fromEntries(Object.entries(det).filter(([, v]) => v !== undefined)), notes: det.notes.length ? det.notes : bill.detected?.notes ?? [] };
-              setBill({ ...bill, total, detected: merged });
-              setAns({ hospitalType: merged.hospitalType, room: merged.room, setting: merged.setting, philhealth: merged.philhealth, category: merged.category, ...Object.fromEntries(Object.entries(ans).filter(([, v]) => v !== undefined)) });
-              setStep(2);
-            }} className="w-full rounded-xl bg-teal-700 px-5 py-4 text-lg font-semibold text-white hover:bg-teal-800">Looks right. Next: about you</button>
+            <button onClick={() => setBill({ ...bill, lines: [...bill.lines, { category: "other", description: "New charge", qty: 1, amount: 0 }] })} className="btn-ghost">+ Add a missing line</button>
+
+            <div className="sticky-cta">
+              <button className="btn-primary" onClick={() => {
+                const det = detectFromBill(bill);
+                const merged: Detected = { ...bill.detected, ...Object.fromEntries(Object.entries(det).filter(([, v]) => v !== undefined)), notes: det.notes.length ? det.notes : bill.detected?.notes ?? [] };
+                setBill({ ...bill, total, detected: merged });
+                setAns({ hospitalType: merged.hospitalType, room: merged.room, setting: merged.setting, philhealth: merged.philhealth, category: merged.category, ...Object.fromEntries(Object.entries(ans).filter(([, v]) => v !== undefined)) });
+                goStep(2);
+              }}>Looks right · Continue</button>
+            </div>
           </section>
         )}
 
         {step === 2 && bill && (
-          <section className="space-y-6">
-            <div><h2 className="text-2xl font-bold">Five quick questions</h2><p className="text-stone-600">Answers stay on your phone. They decide which programs apply.</p></div>
-            <Q label="1. What kind of hospital?" warn={bill.hospitalGuess?.status === "check"} hint={ans.hospitalType && ans.hospitalType === bill.detected?.hospitalType ? <HospitalHint bill={bill} /> : undefined} value={ans.hospitalType} on={(v) => setAns({ ...ans, hospitalType: v })} opts={[["doh", "DOH hospital", "Includes Heart Center, Lung Center, NKTI, PCMC"], ["lgu", "City / provincial (LGU)", ""], ["private", "Private hospital", ""]]} />
-            <Q label="2. What room is the patient in?" hint={ans.room && ans.room === bill.detected?.room ? "Filled in from the room line on your bill. Tap another answer if this is wrong." : undefined} value={ans.room} on={(v) => setAns({ ...ans, room: v })} opts={[["ward", "Ward / basic", "Shared, no extra room charge"], ["private", "Semi-private or private", ""]]} />
-            <Q label="Admitted or outpatient?" hint={ans.setting && ans.setting === bill.detected?.setting ? "Filled in because your bill has a room charge." : undefined} value={ans.setting} on={(v) => setAns({ ...ans, setting: v })} opts={[["inpatient", "Admitted (confined)", ""], ["outpatient", "Outpatient", "Dialysis, chemo, check-ups"]]} />
-            <Q label="3. Is the patient an active PhilHealth member?" hint={ans.philhealth && ans.philhealth === bill.detected?.philhealth ? "Filled in because a PhilHealth deduction is on your bill." : undefined} value={ans.philhealth} on={(v) => setAns({ ...ans, philhealth: v })} opts={[["active", "Yes, active", ""], ["none", "No / not sure", ""]]} />
-            <Q label="4. Patient category" hint={ans.category && ans.category === bill.detected?.category ? "Filled in from a discount line on your bill." : undefined} value={ans.category} on={(v) => setAns({ ...ans, category: v })} opts={[["none", "None of these", ""], ["senior", "Senior citizen (60+)", ""], ["pwd", "Person with disability", ""], ["minor", "Child under 18", ""]]} />
-            <Q label="5. Household monthly income" value={ans.income} on={(v) => setAns({ ...ans, income: v })} opts={[["low", "Below ₱15,000", ""], ["middle", "₱15,000 to ₱40,000", ""], ["high", "Above ₱40,000", ""]]} />
-            <fieldset>
-              <legend className="mb-2 font-semibold">People who depend on this income</legend>
-              <div className="flex items-center gap-3">
-                <button aria-label="Fewer" onClick={() => setAns({ ...ans, dependents: Math.max(0, (ans.dependents ?? 0) - 1) })} className="h-12 w-12 rounded-xl border border-stone-300 bg-white text-xl">−</button>
-                <span className="w-10 text-center text-xl font-bold">{ans.dependents ?? "–"}</span>
-                <button aria-label="More" onClick={() => setAns({ ...ans, dependents: (ans.dependents ?? 0) + 1 })} className="h-12 w-12 rounded-xl border border-stone-300 bg-white text-xl">+</button>
+          <section className="stack">
+            <div className="page-head">
+              <div>
+                <p className="eyebrow">Step 2 of 3 · Details</p>
+                <h1 className="h1">We filled in what your bill shows</h1>
+                <p className="lede">Check these, then answer two questions about your household.</p>
               </div>
-            </fieldset>
-            <label className="block">
-              <span className="mb-1 block font-semibold">Other amount already covered (optional)</span>
-              <span className="mb-2 block text-sm text-stone-600">HMO, or the PhilHealth amount the hospital told you, if it is not on the bill yet.</span>
-              <span className="flex w-48 items-center rounded-xl border border-stone-300 bg-white px-3 py-3"><span className="mr-1">₱</span><input inputMode="numeric" aria-label="Other amount already covered" value={ans.otherCredit ?? ""} onChange={(e) => setAns({ ...ans, otherCredit: Number(e.target.value.replace(/\D/g, "")) || undefined })} className="w-full" /></span>
-            </label>
-            <button disabled={!complete} onClick={() => { setStep(3); window.scrollTo(0, 0); }} className="w-full rounded-xl bg-teal-700 px-5 py-4 text-lg font-semibold text-white hover:bg-teal-800 disabled:bg-stone-300">{t("Show my plan", "Ipakita ang plano ko")}</button>
+            </div>
+
+            <div className="card">
+              <h2 className="h2">From your bill</h2>
+              <Fact k="hospitalType" label="Hospital" ans={ans} setAns={setAns} bill={bill} note={<HospitalHint bill={bill} />} warn={bill.hospitalGuess?.status === "check"}
+                opts={[["doh", "DOH hospital", "Includes Heart Center, Lung Center, NKTI, PCMC"], ["lgu", "City / provincial (LGU)", ""], ["private", "Private hospital", ""]]} />
+              <Fact k="room" label="Room" ans={ans} setAns={setAns} bill={bill} note="From the room line on your bill."
+                opts={[["ward", "Ward / basic", "Shared, no extra room charge"], ["private", "Semi-private or private", ""]]} />
+              <Fact k="setting" label="Care" ans={ans} setAns={setAns} bill={bill} note="Your bill has a room charge."
+                opts={[["inpatient", "Admitted (confined)", ""], ["outpatient", "Outpatient", "Dialysis, chemo, check-ups"]]} />
+              <Fact k="philhealth" label="PhilHealth" ans={ans} setAns={setAns} bill={bill} note="A PhilHealth deduction is on your bill."
+                opts={[["active", "Active member", ""], ["none", "No / not sure", ""]]} />
+              <Fact k="category" label="Patient" ans={ans} setAns={setAns} bill={bill} note="From a discount line on your bill."
+                opts={[["none", "None of these", ""], ["senior", "Senior citizen (60+)", ""], ["pwd", "Person with disability", ""], ["minor", "Child under 18", ""]]} />
+            </div>
+
+            <div className="card">
+              <h2 className="h2">About your household</h2>
+              <p className="hint">Used only to estimate aid. Stays on this device.</p>
+              <Choice label="Monthly household income" value={ans.income} on={(v) => setAns({ ...ans, income: v })}
+                opts={[["low", "Below ₱15,000", ""], ["middle", "₱15,000 to ₱40,000", ""], ["high", "Above ₱40,000", ""]]} />
+              <fieldset className="q">
+                <legend className="q-label">People who depend on this income</legend>
+                <div className="stepper-num">
+                  <button aria-label="Fewer" onClick={() => setAns({ ...ans, dependents: Math.max(0, (ans.dependents ?? 0) - 1) })}>−</button>
+                  <output aria-live="polite">{ans.dependents ?? "–"}</output>
+                  <button aria-label="More" onClick={() => setAns({ ...ans, dependents: (ans.dependents ?? 0) + 1 })}>+</button>
+                </div>
+              </fieldset>
+              <label className="q">
+                <span className="q-label">Other amount already covered <span className="opt">(optional)</span></span>
+                <span className="hint">HMO, or a PhilHealth amount the hospital quoted that is not on the bill yet.</span>
+                <span className="money-field"><span>₱</span><input inputMode="numeric" aria-label="Other amount already covered" value={ans.otherCredit ?? ""} onChange={(e) => setAns({ ...ans, otherCredit: Number(e.target.value.replace(/\D/g, "")) || undefined })} /></span>
+              </label>
+            </div>
+
+            <div className="sticky-cta">
+              {!complete && <p className="cta-hint">Answer the questions marked “Needs your answer” to continue.</p>}
+              <button className="btn-primary" disabled={!complete} onClick={() => goStep(3)}>{t("Show my plan", "Ipakita ang plano ko")}</button>
+            </div>
           </section>
         )}
 
         {step === 3 && bill && plan && (
-          <section className="space-y-6">
-            <div role="group" aria-label="Language" className="no-print flex justify-end print:hidden"><div className="flex overflow-hidden rounded-lg border border-stone-300 text-sm">{(["en", "tl"] as Lang[]).map((l) => <button key={l} onClick={() => setLang(l)} aria-pressed={lang === l} className={`px-3 py-2 ${lang === l ? "bg-teal-700 text-white" : "bg-white"}`}>{l === "en" ? "English" : "Taglish"}</button>)}</div></div>
-            <p role="note" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"><b>{t("Estimate only.", "Estimate lang ito.")}</b> {t("Confirm every item with the hospital billing office or PhilHealth. Aid is assessed case by case and is not guaranteed.", "Kumpirmahin ang bawat item sa billing office ng ospital o sa PhilHealth. Case by case ang assessment ng tulong at hindi ito garantisado.")}</p>
-
-            <div>
-              <h2 className="mb-1 text-xl font-bold">{t("What you may owe", "Magkano ang posibleng babayaran mo")}</h2>
-              <p className="mb-2 text-sm text-stone-600">{t(`Of ${peso(total)} billed. Which one applies depends on the answers below.`, `Mula sa ${peso(total)} na sinisingil. Depende sa mga sagot sa ibaba kung alin ang tatama.`)}</p>
-              <ul className="space-y-2">
-                {plan.scenarios.map((sc, i) => (
-                  <li key={sc.id} className={`rounded-2xl p-4 ${i === 0 ? "bg-teal-800 text-white" : "border border-stone-200 bg-white"}`}>
-                    <p className={`text-sm ${i === 0 ? "opacity-90" : "text-stone-600"}`}>{sc.label[lang]}</p>
-                    <p className="text-2xl font-bold">{peso(sc.amount)}</p>
-                    <p className={`mt-1 text-sm ${i === 0 ? "opacity-90" : "text-stone-700"}`}><b>{t("What decides it: ", "Ano ang magpapasya: ")}</b>{sc.when[lang]}</p>
-                  </li>
-                ))}
-              </ul>
+          <section className="stack">
+            <div className="page-head">
+              <div>
+                <p className="eyebrow">Step 3 of 3 · {t("Your plan", "Ang plano mo")}</p>
+                <h1 className="h1">{t("What you may owe, and what to do next", "Magkano ang posibleng babayaran, at ano ang susunod")}</h1>
+              </div>
+              <Seg />
             </div>
+            <p role="note" className="estimate-banner"><b>{t("Estimate only.", "Estimate lang ito.")}</b> {t("Confirm with the hospital billing office or PhilHealth. Aid is assessed case by case and is not guaranteed.", "Kumpirmahin sa billing office ng ospital o sa PhilHealth. Case by case ang assessment ng tulong at hindi ito garantisado.")}</p>
 
             <div>
-              <h2 className="mb-2 text-xl font-bold">{t("How we got there", "Paano namin ito nakuha")}</h2>
-              <ul className="space-y-1">
-                {plan.waterfall.map((w, i) => (
-                  <li key={i} className="flex items-baseline justify-between rounded-lg bg-white px-3 py-2 shadow-sm">
-                    <span>{w.label}{w.note && <span className="ml-2 text-xs text-stone-500">{w.note}</span>}</span>
-                    {w.amount !== 0 && <span className={`font-semibold ${w.amount < 0 ? "text-emerald-700" : ""}`}>{w.amount < 0 ? "−" : ""}{peso(Math.abs(w.amount))}</span>}
+              <p className="k">{t(`From ${peso(total)} billed`, `Mula sa ${peso(total)} na sinisingil`)}</p>
+              <ul className="scenarios">
+                {plan.scenarios.map((sc, i) => (
+                  <li key={sc.id} className={`scenario ${i === 0 ? "lead" : ""}`}>
+                    <p className="sc-label">{sc.label[lang]}</p>
+                    <p className="sc-amount">{peso(sc.amount)}</p>
+                    <p className="sc-when"><b>{t("What decides it: ", "Ano ang magpapasya: ")}</b>{sc.when[lang]}</p>
                   </li>
                 ))}
               </ul>
             </div>
 
             {plan.flags.length > 0 && (
-              <div>
-                <h2 className="mb-2 text-xl font-bold">{t("Ask about these on your bill", "Itanong ang mga ito tungkol sa bill mo")}</h2>
-                <ul className="space-y-2">{plan.flags.map((f, i) => <li key={i} className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">{f}</li>)}</ul>
+              <div className="card">
+                <h2 className="h2">{t("Ask billing about these", "Itanong sa billing ang mga ito")}</h2>
+                <ul className="flags">{plan.flags.map((f, i) => <li key={i}><span aria-hidden="true">⚠</span>{f}</li>)}</ul>
               </div>
             )}
 
-            <div>
-              <h2 className="mb-2 text-xl font-bold">{t("Programs that may help", "Mga programang puwedeng tumulong")}</h2>
-              <ul className="space-y-3">{plan.programs.filter((p) => p.status !== "no").map((p) => <Program key={p.id} p={p} />)}</ul>
-            </div>
-
-            <div>
-              <h2 className="mb-2 text-xl font-bold">{t("Your plan, in order", "Ang plano mo, ayon sa pagkakasunod")}</h2>
-              <ol className="space-y-3">
+            <div className="card">
+              <h2 className="h2">{t("Your plan, in order", "Ang plano mo, ayon sa pagkakasunod")}</h2>
+              <p className="hint">{t("A practical order. Offices may direct you differently. Ticks are saved on this device.", "Mungkahing pagkakasunod. Puwedeng iba ang ituro ng opisina. Naka-save sa device na ito ang mga tsek.")}</p>
+              <ol className="checklist">
                 {plan.checklist.map((s) => (
-                  <li key={s.order} className="rounded-xl bg-white p-4 shadow-sm">
-                    <label className="flex items-start gap-3">
-                      <input type="checkbox" checked={!!done[s.order]} onChange={(e) => setDone({ ...done, [s.order]: e.target.checked })} className="mt-1 h-5 w-5 print:hidden" />
-                      <span className="print:before:content-['☐_']">
-                        <b>{s.order}. {s.office}</b>
-                        <span className="block text-sm text-stone-700">{s.action}</span>
-                        {s.bring.length > 0 && <span className="mt-1 block text-sm"><b>Bring:</b> {s.bring.join("; ")}</span>}
-                        <span className="block text-sm text-stone-500">Covers: {s.covers}</span>
-                      </span>
-                    </label>
+                  <li key={s.order} className={done[s.order] ? "is-done" : ""}>
+                    <span className="ck-num" aria-hidden="true">{s.order}</span>
+                    <div className="ck-body">
+                      <p className="ck-office">{s.office}</p>
+                      <p>{s.action}</p>
+                      {s.bring.length > 0 && <p className="ck-bring"><b>{t("Bring", "Dalhin")}:</b> {s.bring.join(" · ")}</p>}
+                      <p className="ck-covers">{t("Covers", "Sakop")}: {s.covers}</p>
+                    </div>
+                    <label className="ck-box no-print"><input type="checkbox" checked={!!done[s.order]} onChange={(e) => setDone({ ...done, [s.order]: e.target.checked })} /><span className="sr-only">Done</span></label>
                   </li>
                 ))}
               </ol>
             </div>
 
-            <div className="rounded-2xl border border-teal-200 bg-teal-50 p-4">
-              <h2 className="text-lg font-bold">{t("Know your rights", "Alamin ang karapatan mo")}</h2>
-              <p className="mt-1 text-sm">{plan.detentionNote}</p>
-              <p className="mt-2 text-sm"><b>{t("At the cashier, you can say:", "Sa cashier, puwede mong sabihin:")}</b> {t("“Please show me my PhilHealth deduction and give me an itemized bill. I would like to see the social worker for an assessment before I pay.”", "“Pakipakita po ang PhilHealth deduction ko at bigyan po ako ng itemized na bill. Gusto ko pong makausap ang social worker para ma-assess bago ako magbayad.”")}</p>
+            <div className="card">
+              <h2 className="h2">{t("Programs that may help", "Mga programang puwedeng tumulong")}</h2>
+              <ul className="programs">{plan.programs.filter((p) => p.status !== "no").map((p) => <Program key={p.id} p={p} />)}</ul>
             </div>
 
-            <div>
-              <h2 className="mb-2 text-xl font-bold">{t("Request letter (English)", "Sulat ng request (English)")}</h2>
-              <div className="no-print mb-2 grid gap-2 sm:grid-cols-2 print:hidden">
+            <div className="card">
+              <h2 className="h2">{t("How we got there", "Paano namin ito nakuha")}</h2>
+              <ul className="ledger">
+                {plan.waterfall.map((w, i) => (
+                  <li key={i}>
+                    <span>{w.label}{w.note && <small> {w.note}</small>}</span>
+                    {w.amount !== 0 && <span className={`num ${w.amount < 0 ? "minus" : ""}`}>{w.amount < 0 ? "−" : ""}{peso(Math.abs(w.amount))}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="card rights">
+              <h2 className="h2">{t("If you cannot pay now", "Kung hindi ka pa makabayad")}</h2>
+              <p>{plan.detentionNote}</p>
+              <p className="script"><b>{t("You can say:", "Puwede mong sabihin:")}</b> {t("“Please show me my PhilHealth deduction and give me an itemized bill. I would like to see the social worker for an assessment before I pay.”", "“Pakipakita po ang PhilHealth deduction ko at bigyan po ako ng itemized na bill. Gusto ko pong makausap ang social worker para ma-assess bago ako magbayad.”")}</p>
+            </div>
+
+            <div className="card">
+              <h2 className="h2">{t("Request letter", "Sulat ng request")} <span className="opt">(English)</span></h2>
+              <div className="letter-fields no-print">
                 {([["patient", "Patient name"], ["requester", "Your name"], ["relationship", "Relationship (e.g. daughter)"], ["contact", "Contact number"]] as const).map(([k, ph]) => (
-                  <input key={k} placeholder={ph} aria-label={ph} value={lf[k]} onChange={(e) => setLf({ ...lf, [k]: e.target.value })} className="rounded-lg border border-stone-300 bg-white px-3 py-2" />
+                  <label key={k}><span>{ph}</span><input value={lf[k]} onChange={(e) => setLf({ ...lf, [k]: e.target.value })} /></label>
                 ))}
               </div>
-              <pre className="whitespace-pre-wrap rounded-xl bg-white p-4 font-sans text-sm leading-relaxed shadow-sm">{letter}</pre>
+              <pre className="letter">{letter}</pre>
             </div>
 
-            <div className="rounded-2xl border border-stone-300 bg-white p-4">
-              <h2 className="text-lg font-bold">{t("What this cannot tell you", "Ang hindi masasabi ng tool na ito")}</h2>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-stone-800">{LIMITS.map((l, i) => <li key={i}>{l[lang]}</li>)}</ul>
+            <div className="card limits">
+              <h2 className="h2">{t("What this cannot tell you", "Ang hindi masasabi ng tool na ito")}</h2>
+              <ul>{LIMITS.map((l, i) => <li key={i}>{l[lang]}</li>)}</ul>
             </div>
 
-            <div className="no-print flex flex-col gap-2 sm:flex-row print:hidden">
-              <button onClick={() => window.print()} className="flex-1 rounded-xl bg-teal-700 px-5 py-4 font-semibold text-white hover:bg-teal-800">{t("Print plan and letter", "I-print ang plano at sulat")}</button>
-              <button onClick={() => setStep(2)} className="flex-1 rounded-xl border border-stone-300 px-5 py-4 font-medium hover:bg-stone-100">{t("Change my answers", "Baguhin ang sagot ko")}</button>
+            <div className="actions no-print">
+              <button className="btn-primary" onClick={() => window.print()}>{t("Print plan and letter", "I-print ang plano at sulat")}</button>
+              <button className="btn-secondary" onClick={() => goStep(2)}>{t("Change my answers", "Baguhin ang sagot ko")}</button>
             </div>
           </section>
         )}
@@ -325,17 +383,51 @@ export default function Home() {
   );
 }
 
-function Q<T extends string>({ label, hint, warn, value, on, opts }: { label: string; hint?: React.ReactNode; warn?: boolean; value?: T; on: (v: T) => void; opts: [T, string, string][] }) {
+type FactKey = "hospitalType" | "room" | "setting" | "philhealth" | "category";
+
+function Fact<K extends FactKey>({ k, label, ans, setAns, bill, note, warn, opts }: {
+  k: K; label: string; ans: Partial<Answers>; setAns: (a: Partial<Answers>) => void; bill: Bill; note: React.ReactNode; warn?: boolean; opts: [Answers[K], string, string][];
+}) {
+  const [open, setOpen] = useState(false);
+  const value = ans[k] as Answers[K] | undefined;
+  const fromBill = value !== undefined && (value as string) === (bill.detected?.[k] as string | undefined);
+  const show = open || value === undefined;
+  const current = opts.find(([v]) => v === value)?.[1];
+  const tag = value === undefined ? { c: "need", t: "Needs your answer" } : fromBill && warn ? { c: "check", t: "Please check" } : fromBill ? { c: "bill", t: "From your bill" } : { c: "you", t: "Your answer" };
   return (
-    <fieldset>
-      <legend className="mb-1 font-semibold">{label}</legend>
-      {hint && <p className={`mb-2 text-sm font-medium ${warn ? "text-amber-800" : "text-teal-800"}`}>{warn ? "⚠" : "✓"} {hint}</p>}
-      {!hint && <div className="mb-1" />}
-      <div className="grid gap-2">
+    <div className="fact">
+      <div className="fact-row">
+        <div className="fact-main">
+          <p className="k">{label}</p>
+          <p className="v">{current ?? "Not on the bill"}</p>
+          {fromBill && <p className={`fact-note ${warn ? "warn" : ""}`}>{note}</p>}
+        </div>
+        <div className="fact-side">
+          <span className={`tag ${tag.c}`}>{tag.t}</span>
+          {value !== undefined && <button className="link-btn" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? "Done" : "Change"}</button>}
+        </div>
+      </div>
+      {show && (
+        <div className="choices" role="group" aria-label={label}>
+          {opts.map(([v, t, sub]) => (
+            <button key={String(v)} type="button" aria-pressed={value === v} className="choice" onClick={() => { setAns({ ...ans, [k]: v }); setOpen(false); }}>
+              <span>{t}</span>{sub && <small>{sub}</small>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Choice<T extends string>({ label, value, on, opts }: { label: string; value?: T; on: (v: T) => void; opts: [T, string, string][] }) {
+  return (
+    <fieldset className="q">
+      <legend className="q-label">{label}</legend>
+      <div className="choices">
         {opts.map(([v, t, sub]) => (
-          <button key={v} type="button" aria-pressed={value === v} onClick={() => on(v)}
-            className={`rounded-xl border px-4 py-3 text-left ${value === v ? "border-teal-700 bg-teal-50 ring-2 ring-teal-700" : "border-stone-300 bg-white hover:bg-stone-100"}`}>
-            <span className="font-medium">{t}</span>{sub && <span className="block text-sm text-stone-600">{sub}</span>}
+          <button key={v} type="button" aria-pressed={value === v} className="choice" onClick={() => on(v)}>
+            <span>{t}</span>{sub && <small>{sub}</small>}
           </button>
         ))}
       </div>
@@ -346,14 +438,14 @@ function Q<T extends string>({ label, hint, warn, value, on, opts }: { label: st
 function Program({ p }: { p: ProgramResult }) {
   const b = BADGE[p.status];
   return (
-    <li className="rounded-xl bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-2"><h3 className="font-semibold">{p.name}</h3><span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${b.c}`}>{b.t}</span></div>
-      <p className="mt-1 text-sm text-stone-800">{p.reason}</p>
-      <details className="mt-2 text-sm">
-        <summary className="cursor-pointer font-medium text-teal-800 print:hidden">Why this result?</summary>
-        <div className="mt-2 space-y-1 rounded-lg bg-stone-50 p-3 text-stone-700">
-          <p><b>Based on your answers:</b> {p.triggers.join(", ")}</p>
-          <p><b>Source:</b> <a href={p.sourceUrl} target="_blank" rel="noreferrer" className="underline">{p.source}</a>. Checked {p.lastVerified}.</p>
+    <li className="program">
+      <div className="program-head"><h3>{p.name}</h3><span className={`tag ${b.c}`}>{b.t}</span></div>
+      <p>{p.reason}</p>
+      <details>
+        <summary className="no-print">Why this result?</summary>
+        <div className="why">
+          <p><b>Based on:</b> {p.triggers.join(" · ")}</p>
+          <p><b>Source:</b> <a href={p.sourceUrl} target="_blank" rel="noreferrer">{p.source}</a>, checked {p.lastVerified}</p>
           <p><b>Not yet verified:</b> {p.caveat}</p>
         </div>
       </details>
@@ -363,11 +455,11 @@ function Program({ p }: { p: ProgramResult }) {
 
 function HospitalHint({ bill }: { bill: Bill }) {
   const g = bill.hospitalGuess;
-  if (!g) return <>Filled in from your bill ({bill.hospitalName}). Tap another answer if this is wrong.</>;
+  if (!g) return <>Read from the hospital name on your bill.</>;
   const lead = g.status === "confirmed" ? "Checked two ways." : g.status === "likely" ? "Our best read." : "Please double-check.";
   return (
     <>
-      {lead} {g.evidence} {g.sourceUrl && <a href={g.sourceUrl} target="_blank" rel="noreferrer" className="underline">Source</a>}
+      {lead} {g.evidence} {g.sourceUrl && <a href={g.sourceUrl} target="_blank" rel="noreferrer">Source</a>}
     </>
   );
 }
