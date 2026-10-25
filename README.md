@@ -1,7 +1,7 @@
 # Akop
 
 <p align="center">
-  <img src="docs/ux/akop-icon.png" alt="Akop logo" width="120" />
+  <img src="docs/ux/akop-logo-full.png" alt="Akop logo" width="320" />
 </p>
 
 <p align="center">
@@ -297,15 +297,15 @@ Do not commit `.env.local`. Vercel deploys from `navigator/` on every push to `m
 ## Visual Identity and Assets
 
 <p align="center">
-  <img src="docs/ux/akop-icon.png" alt="Akop logo" height="96" />
-  <img src="docs/ux/akop-icon.svg" alt="Akop logo vector" height="96" />
+  <img src="docs/ux/akop-logo-full.png" alt="Akop logo" height="96" />
+  <img src="docs/ux/akop-logo-full.svg" alt="Akop logo vector" height="96" />
   <img src="navigator/public/sample-soa.jpg" alt="Fictional sample bill" height="96" />
 </p>
 
 | Asset | File | Used for |
 | --- | --- | --- |
-| Logo icon (raster) | `docs/ux/akop-icon.png` | README, branding |
-| Logo icon (vector) | `docs/ux/akop-icon.svg` | Branding |
+| Logo (raster) | `docs/ux/akop-logo-full.png` | README, branding |
+| Logo (vector) | `docs/ux/akop-logo-full.svg` | Branding |
 | Sample bill | `navigator/public/sample-soa.jpg` | Fictional Statement of Account for demos |
 | Prototype | `docs/ux/prototype.html` | Early interaction prototype |
 | Design spec | `docs/ux/DESIGN.md` | Tokens, components, accessibility |
