@@ -86,3 +86,23 @@ describe("escalation trigger (FR01.03)", () => {
   it("fires when lines do not match the total", () => expect(isShaky(mk([{ category: "other", description: "A", qty: 1, amount: 100 }], 500))).toBe(true));
   it("stays quiet on a clean read", () => expect(isShaky(SAMPLE_BILL)).toBe(false));
 });
+
+describe("scenarios", () => {
+  it("shows a zero case, a no-aid case and an aid case for a low-income DOH ward stay", () => {
+    const s = evaluate(SAMPLE_BILL, base).scenarios;
+    expect(s.map((x) => x.id)).toEqual(["zbb", "no_aid", "with_aid"]);
+    expect(s[0].amount).toBe(0);
+    expect(s[1].amount).toBe(SAMPLE_BILL.total);
+    expect(s[2].amount).toBe(SAMPLE_BILL.total - 75_000);
+  });
+  it("has no ZBB scenario at a private hospital and none with aid for high income", () => {
+    const s = evaluate(SAMPLE_BILL, { ...base, hospitalType: "private", income: "high" }).scenarios;
+    expect(s.map((x) => x.id)).toEqual(["no_aid"]);
+  });
+  it("never shows a negative amount", () => {
+    for (const x of evaluate(SAMPLE_BILL, { ...base, otherCredit: 500_000 }).scenarios) expect(x.amount).toBeGreaterThanOrEqual(0);
+  });
+  it("has English and Taglish text on every scenario", () => {
+    for (const x of evaluate(SAMPLE_BILL, base).scenarios) expect(x.label.en && x.label.tl && x.when.en && x.when.tl).toBeTruthy();
+  });
+});

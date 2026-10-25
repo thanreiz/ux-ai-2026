@@ -26,7 +26,7 @@ Dear Ma'am/Sir,
 
 I am ${f.requester || "[your name]"}, the ${f.relationship || "[relationship]"} of ${f.patient || "[patient name]"}, who is currently ${a.setting === "inpatient" ? "confined" : "receiving outpatient care"} in your hospital${a.room === "ward" ? " in a ward bed" : ""}.
 
-The Statement of Account shows total charges of ${peso(bill.total)}. After PhilHealth and applicable discounts, our estimated remaining balance is between ${peso(plan.remaining.min)} and ${peso(plan.remaining.max)}. Our household has ${a.dependents} dependent(s) and our family is unable to pay this amount without serious hardship.
+The Statement of Account shows total charges of ${peso(bill.total)}. After PhilHealth and applicable discounts, our estimated remaining balance, if no aid is approved, is ${peso(plan.scenarios.find((x) => x.id === "no_aid")?.amount ?? plan.remaining.max)}. Our household has ${a.dependents} dependent(s) and our family is unable to pay this amount without serious hardship.
 
 I respectfully request:
 1. An assessment by your social worker of our eligibility for medical assistance.

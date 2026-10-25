@@ -60,7 +60,15 @@ export interface ChecklistStep {
   covers: string;
 }
 
+export interface Scenario {
+  id: "zbb" | "no_aid" | "with_aid";
+  amount: number;
+  label: { en: string; tl: string };
+  when: { en: string; tl: string }; // what decides it / who to ask
+}
+
 export interface Plan {
+  scenarios: Scenario[];
   programs: ProgramResult[];
   waterfall: WaterfallStep[];
   remaining: { min: number; max: number };

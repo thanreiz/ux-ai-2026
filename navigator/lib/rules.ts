@@ -1,4 +1,4 @@
-import type { Answers, Bill, ChecklistStep, Plan, ProgramResult, WaterfallStep } from "./types";
+import type { Answers, Bill, ChecklistStep, Plan, ProgramResult, Scenario, WaterfallStep } from "./types";
 
 // Every rule is plain code. AI never decides eligibility.
 // Facts come from Codex research (2026-10-25). Items marked caveat are UNVERIFIED against full official texts.
@@ -120,7 +120,7 @@ export function evaluate(bill: Bill, a: Answers): Plan {
   if (zbb === "likely") { min = 0; waterfall.push({ label: "ZBB if confirmed", amount: -balance, note: "Best case. Confirm with the hospital." }); }
   else if (lowIncome && isPublic) min = Math.max(0, balance - AICS_CAP);
   else if (lowIncome) min = Math.max(0, balance - AICS_CAP);
-  waterfall.push({ label: "Estimated remaining", amount: 0, note: `${peso(min)} to ${peso(max)}` });
+  waterfall.push({ label: "Balance before any aid", amount: 0, note: peso(max) });
 
   const flags: string[] = [];
   if (a.room === "ward" && bill.lines.some((l) => l.category === "room" && /private|semi/i.test(l.description)))
@@ -140,7 +140,27 @@ export function evaluate(bill: Bill, a: Answers): Plan {
   if (bill.total > 0 && Math.abs(lineSum - bill.total) > Math.max(1, bill.total * 0.01) && Math.abs(lineSum - shownDeductions - bill.total) > Math.max(1, bill.total * 0.01))
     flags.push(`The lines add up to ${peso(lineSum)} but the bill total says ${peso(bill.total)}. Ask billing to explain the difference.`);
 
-  return { programs, waterfall, remaining: { min, max }, flags, checklist: buildChecklist(programs, a), detentionNote: detention(a) };
+  const scenarios: Scenario[] = [];
+  if (zbb === "likely" || zbb === "maybe")
+    scenarios.push({
+      id: "zbb", amount: 0,
+      label: { en: zbb === "likely" ? "If zero balance billing covers your stay" : "If your LGU hospital is in the zero balance expansion", tl: zbb === "likely" ? "Kung sakop ng zero balance billing ang confinement mo" : "Kung kasama ang LGU hospital mo sa zero balance expansion" },
+      when: { en: "Ask the PhilHealth CARES nurse or billing: is this stay covered by ZBB?", tl: "Itanong sa PhilHealth CARES nurse o billing: sakop ba ng ZBB ang confinement na ito?" },
+    });
+  scenarios.push({
+    id: "no_aid", amount: max,
+    label: { en: "If no aid is approved", tl: "Kung walang maaprubahang tulong" },
+    when: { en: shownDeductions === 0 && a.philhealth === "active" ? "No PhilHealth deduction is on the bill yet. Ask billing to apply it first. This amount should go down." : "This is what remains after the deductions, discounts and other cover we know about.", tl: shownDeductions === 0 && a.philhealth === "active" ? "Wala pang PhilHealth deduction sa bill. Ipa-apply muna sa billing. Dapat bumaba ang halagang ito." : "Ito ang natitira matapos ang mga deduction, discount at ibang cover na alam namin." },
+  });
+  if (lowIncome || isPublic) {
+    const aided = Math.max(0, max - AICS_CAP);
+    scenarios.push({
+      id: "with_aid", amount: aided,
+      label: { en: "If DSWD and DOH aid cover the most they can", tl: "Kung pinakamataas ang sakop ng tulong ng DSWD at DOH" },
+      when: { en: `Needs a social worker assessment. DSWD can go up to ${peso(AICS_CAP)} in justified cases. Not guaranteed.`, tl: `Kailangan ng assessment ng social worker. Hanggang ${peso(AICS_CAP)} ang kaya ng DSWD sa makatwirang kaso. Hindi garantisado.` },
+    });
+  }
+  return { scenarios, programs, waterfall, remaining: { min, max }, flags, checklist: buildChecklist(programs, a), detentionNote: detention(a) };
 }
 
 function detention(a: Answers) {

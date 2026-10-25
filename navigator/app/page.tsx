@@ -6,6 +6,7 @@ import { detectFromBill, type Detected } from "@/lib/detect";
 import { evaluate } from "@/lib/rules";
 import { SAMPLE_BILL, SAMPLE_EXPLANATIONS } from "@/lib/sample";
 import { buildLetter, type LetterFields } from "@/lib/letter";
+import { LIMITS } from "@/lib/limits";
 
 type Expl = Record<string, { en: string; tl: string }>;
 type Lang = "en" | "tl";
@@ -228,10 +229,18 @@ export default function Home() {
             <div role="group" aria-label="Language" className="no-print flex justify-end print:hidden"><div className="flex overflow-hidden rounded-lg border border-stone-300 text-sm">{(["en", "tl"] as Lang[]).map((l) => <button key={l} onClick={() => setLang(l)} aria-pressed={lang === l} className={`px-3 py-2 ${lang === l ? "bg-teal-700 text-white" : "bg-white"}`}>{l === "en" ? "English" : "Taglish"}</button>)}</div></div>
             <p role="note" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"><b>{t("Estimate only.", "Estimate lang ito.")}</b> {t("Confirm every item with the hospital billing office or PhilHealth. Aid is assessed case by case and is not guaranteed.", "Kumpirmahin ang bawat item sa billing office ng ospital o sa PhilHealth. Case by case ang assessment ng tulong at hindi ito garantisado.")}</p>
 
-            <div className="rounded-2xl bg-teal-800 p-5 text-white">
-              <p className="text-sm opacity-80">{t("You may still owe", "Baka may babayaran ka pang")}</p>
-              <p className="text-3xl font-bold">{plan.remaining.min === plan.remaining.max ? peso(plan.remaining.max) : `${peso(plan.remaining.min)} to ${peso(plan.remaining.max)}`}</p>
-              <p className="mt-1 text-sm opacity-80">{t(`of ${peso(total)} billed, depending on which aid is approved.`, `mula sa ${peso(total)} na sinisingil, depende kung aling tulong ang maaprubahan.`)}</p>
+            <div>
+              <h2 className="mb-1 text-xl font-bold">{t("What you may owe", "Magkano ang posibleng babayaran mo")}</h2>
+              <p className="mb-2 text-sm text-stone-600">{t(`Of ${peso(total)} billed. Which one applies depends on the answers below.`, `Mula sa ${peso(total)} na sinisingil. Depende sa mga sagot sa ibaba kung alin ang tatama.`)}</p>
+              <ul className="space-y-2">
+                {plan.scenarios.map((sc, i) => (
+                  <li key={sc.id} className={`rounded-2xl p-4 ${i === 0 ? "bg-teal-800 text-white" : "border border-stone-200 bg-white"}`}>
+                    <p className={`text-sm ${i === 0 ? "opacity-90" : "text-stone-600"}`}>{sc.label[lang]}</p>
+                    <p className="text-2xl font-bold">{peso(sc.amount)}</p>
+                    <p className={`mt-1 text-sm ${i === 0 ? "opacity-90" : "text-stone-700"}`}><b>{t("What decides it: ", "Ano ang magpapasya: ")}</b>{sc.when[lang]}</p>
+                  </li>
+                ))}
+              </ul>
             </div>
 
             <div>
@@ -291,6 +300,11 @@ export default function Home() {
                 ))}
               </div>
               <pre className="whitespace-pre-wrap rounded-xl bg-white p-4 font-sans text-sm leading-relaxed shadow-sm">{letter}</pre>
+            </div>
+
+            <div className="rounded-2xl border border-stone-300 bg-white p-4">
+              <h2 className="text-lg font-bold">{t("What this cannot tell you", "Ang hindi masasabi ng tool na ito")}</h2>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-stone-800">{LIMITS.map((l, i) => <li key={i}>{l[lang]}</li>)}</ul>
             </div>
 
             <div className="no-print flex flex-col gap-2 sm:flex-row print:hidden">
