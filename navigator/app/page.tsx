@@ -182,7 +182,7 @@ export default function Home() {
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l1.5-2h7L17 7h3v12H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
                 <span>{busy || "Take a photo of the bill"}</span>
               </button>
-              <button onClick={() => fileRef.current?.click()} disabled={!!busy} className="capture-secondary">Choose a photo from this device</button>
+              <button onClick={() => fileRef.current?.click()} disabled={!!busy} className="capture-secondary">Choose from your photos</button>
               <button onClick={runSamplePhoto} disabled={!!busy} className="sample-link">Try the fictional sample bill <span aria-hidden="true">→</span></button>
               {busy && <p className="capture-tip" role="status" aria-live="polite">{busy} This takes about 10 to 20 seconds.</p>}
               {!busy && <p className="capture-tip">Lay the bill flat in good light. Keep every line and the total in frame.</p>}
