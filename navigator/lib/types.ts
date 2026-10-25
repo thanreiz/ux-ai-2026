@@ -27,7 +27,7 @@ export interface Answers {
 export type Status = "applies" | "likely" | "maybe" | "no";
 
 export interface ProgramResult {
-  id: "zbb" | "philhealth" | "maifip" | "aics" | "pcso" | "malasakit";
+  id: "zbb" | "philhealth" | "maifip" | "aics" | "pcso" | "malasakit" | "discount";
   name: string;
   status: Status;
   reason: string;
@@ -35,7 +35,9 @@ export interface ProgramResult {
   covers: string;
   documents: string[];
   office: string;
+  caveat: string; // what is still unverified
   source: string;
+  sourceUrl: string;
   lastVerified: string;
 }
 
@@ -45,9 +47,19 @@ export interface WaterfallStep {
   note?: string;
 }
 
+export interface ChecklistStep {
+  order: number;
+  office: string;
+  action: string;
+  bring: string[];
+  covers: string;
+}
+
 export interface Plan {
   programs: ProgramResult[];
   waterfall: WaterfallStep[];
   remaining: { min: number; max: number };
   flags: string[];
+  checklist: ChecklistStep[];
+  detentionNote: string;
 }
