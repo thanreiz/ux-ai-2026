@@ -39,6 +39,19 @@ async function shrink(file: File): Promise<string> {
   } finally { URL.revokeObjectURL(url); }
 }
 
+function StatusMark({ tone }: { tone: "warning" | "success" }) {
+  return tone === "warning" ? (
+    <svg className={`status-mark ${tone}`} viewBox="0 0 16 16" aria-hidden="true">
+      <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M8 4.7v4.1M8 11.2v.1" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  ) : (
+    <svg className={`status-mark ${tone}`} viewBox="0 0 16 16" aria-hidden="true">
+      <path d="m3.5 8.2 2.8 2.7 6.2-6" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function Home() {
   const [step, setStep] = useState(0);
   const [bill, setBill] = useState<Bill | null>(null);
@@ -136,7 +149,7 @@ export default function Home() {
             <ol className="stepper" aria-label="Progress">
               {["Bill", "Details", "Plan"].map((s, i) => (
                 <li key={s} aria-current={step === i + 1 ? "step" : undefined} className={step === i + 1 ? "on" : step > i + 1 ? "done" : ""}>
-                  <span className="dot">{step > i + 1 ? "✓" : i + 1}</span><span className="lbl">{s}</span>
+                  <span className="dot">{step > i + 1 ? <svg viewBox="0 0 16 16" aria-label="Complete"><path d="m3 8.2 3 3 7-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg> : i + 1}</span><span className="lbl">{s}</span>
                 </li>
               ))}
             </ol>
@@ -148,17 +161,16 @@ export default function Home() {
         {step === 0 && (
           <section className="landing-grid">
             <div className="landing-copy">
-              <p className="landing-kicker">Hospital bill → clear next steps</p>
-              <h1 className="landing-title">Know what to ask about your hospital bill.</h1>
+              <h1 className="landing-title">Understand your hospital <em>bill.</em></h1>
               <p className="landing-intro">Take a photo of the Statement of Account (SOA). We’ll explain the charges, estimate what may remain, and make a step-by-step aid plan.</p>
               <ol className="journey" aria-label="What happens next">
-                <li><span>01</span><div><b>Understand the bill</b><small>Review each charge in plain English or Taglish.</small></div></li>
-                <li><span>02</span><div><b>Check possible support</b><small>See what may apply, with the reason and source.</small></div></li>
-                <li><span>03</span><div><b>Know where to go</b><small>Get an ordered list of offices and documents.</small></div></li>
+                <li><span aria-hidden="true"/><div><b>Understand the bill</b><small>Review each charge in plain English or Taglish.</small></div></li>
+                <li><span aria-hidden="true"/><div><b>Check possible support</b><small>See what may apply, with the reason and source.</small></div></li>
+                <li><span aria-hidden="true"/><div><b>Know where to go</b><small>Get an ordered list of offices and documents.</small></div></li>
               </ol>
             </div>
             <div className="capture-panel">
-              <p className="panel-label">START WITH YOUR BILL</p>
+              <p className="panel-label">Start with your bill</p>
               <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
               <button onClick={() => camRef.current?.click()} disabled={!!busy} className="capture-primary">
@@ -181,24 +193,25 @@ export default function Home() {
             <div className="page-head">
               <div>
                 <p className="eyebrow">Step 1 of 3 · Check the bill</p>
-                <h1 className="h1">Here’s what we read</h1>
+                <h1 className="h1">Here’s what we <em>read</em></h1>
                 <p className="lede">Compare with your paper bill. Tap any amount or name to fix it.</p>
               </div>
               <Seg />
             </div>
 
-            <div className="card summary">
+            <div className="card summary receipt-top">
+              <p className="receipt-title">Statement of account · read by Akop</p>
               <div><p className="k">Hospital</p><p className="v">{bill.hospitalName}</p></div>
               <div className="sum-row">
                 <div><p className="k">Lines add to</p><p className="v num">{peso(total)}</p></div>
                 {stated > 0 && <div><p className="k">Bill says</p><p className="v num">{peso(stated)}</p></div>}
               </div>
-              {mismatch ? <p className="notice">⚠ The lines and the bill total differ by {peso(Math.abs(stated - total))}. Check for a missing or misread line.</p>
-                : <p className="ok">✓ Lines match the bill total.</p>}
-              {lowLines > 0 && <p className="notice">⚠ {lowLines} line{lowLines > 1 ? "s" : ""} we could not read clearly. They are marked below.</p>}
+              {mismatch ? <p className="notice"><StatusMark tone="warning" />The lines and the bill total differ by {peso(Math.abs(stated - total))}. Check for a missing or misread line.</p>
+                : <p className="ok"><StatusMark tone="success" />Lines match the bill total.</p>}
+              {lowLines > 0 && <p className="notice"><StatusMark tone="warning" />{lowLines} line{lowLines > 1 ? "s" : ""} we could not read clearly. They are marked below.</p>}
             </div>
 
-            <ul className="lines">
+            <ul className="lines receipt-body">
               {bill.lines.map((l, i) => (
                 <li key={i} className={`line ${l.lowConfidence ? "warn" : ""} ${l.category === "deduction" ? "deduct" : ""}`}>
                   <div className="line-top">
@@ -212,7 +225,7 @@ export default function Home() {
                     <select aria-label="Category" value={l.category} onChange={(e) => editLine(i, { category: e.target.value as BillLine["category"] })} className="chip-select">
                       {Object.entries(CAT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
-                    {l.lowConfidence && <span className="flag-text">⚠ Please check this line</span>}
+                    {l.lowConfidence && <span className="flag-text"><StatusMark tone="warning" />Please check this line</span>}
                     <button className="remove" onClick={() => setBill({ ...bill, lines: bill.lines.filter((_, j) => j !== i) })}>Remove</button>
                   </div>
                   {l.category !== "deduction" && expl[l.description] && <p className="explain"><span className="explain-tag">{t("What this is", "Ano ito")}</span>{expl[l.description][lang]}</p>}
@@ -238,7 +251,7 @@ export default function Home() {
             <div className="page-head">
               <div>
                 <p className="eyebrow">Step 2 of 3 · Details</p>
-                <h1 className="h1">We filled in what your bill shows</h1>
+                <h1 className="h1">We filled in what your bill <em>shows</em></h1>
                 <p className="lede">Check these, then answer two questions about your household.</p>
               </div>
             </div>
@@ -289,7 +302,7 @@ export default function Home() {
             <div className="page-head">
               <div>
                 <p className="eyebrow">Step 3 of 3 · {t("Your plan", "Ang plano mo")}</p>
-                <h1 className="h1">{t("What you may owe, and what to do next", "Magkano ang posibleng babayaran, at ano ang susunod")}</h1>
+                <h1 className="h1">{lang === "en" ? <>What you may owe, and what to do <em>next</em></> : <>Magkano ang babayaran, at ano ang <em>susunod</em></>}</h1>
               </div>
               <Seg />
             </div>
@@ -311,7 +324,7 @@ export default function Home() {
             {plan.flags.length > 0 && (
               <div className="card">
                 <h2 className="h2">{t("Ask billing about these", "Itanong sa billing ang mga ito")}</h2>
-                <ul className="flags">{plan.flags.map((f, i) => <li key={i}><span aria-hidden="true">⚠</span>{f}</li>)}</ul>
+                <ul className="flags">{plan.flags.map((f, i) => <li key={i}><StatusMark tone="warning" />{f}</li>)}</ul>
               </div>
             )}
 
@@ -403,7 +416,7 @@ function Fact<K extends FactKey>({ k, label, ans, setAns, bill, note, warn, opts
           {fromBill && <p className={`fact-note ${warn ? "warn" : ""}`}>{note}</p>}
         </div>
         <div className="fact-side">
-          <span className={`tag ${tag.c}`}>{tag.t}</span>
+          <span className={`tag ${tag.c}`}>{tag.c === "bill" && <StatusMark tone="success" />}{tag.c === "check" && <StatusMark tone="warning" />}{tag.t}</span>
           {value !== undefined && <button className="link-btn" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? "Done" : "Change"}</button>}
         </div>
       </div>
@@ -439,7 +452,7 @@ function Program({ p }: { p: ProgramResult }) {
   const b = BADGE[p.status];
   return (
     <li className="program">
-      <div className="program-head"><h3>{p.name}</h3><span className={`tag ${b.c}`}>{b.t}</span></div>
+      <div className="program-head"><h3>{p.name}</h3><span className={`tag stamp ${b.c}`}>{b.c === "bill" && <StatusMark tone="success" />}{b.c === "check" && <StatusMark tone="warning" />}{b.t}</span></div>
       <p>{p.reason}</p>
       <details>
         <summary className="no-print">Why this result?</summary>
