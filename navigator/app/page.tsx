@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import type { Answers, Bill, BillLine, ProgramResult, Status } from "@/lib/types";
+import { detectFromBill, type Detected } from "@/lib/detect";
 import { evaluate } from "@/lib/rules";
 import { SAMPLE_BILL, SAMPLE_EXPLANATIONS } from "@/lib/sample";
 import { buildLetter, type LetterFields } from "@/lib/letter";
@@ -153,16 +154,22 @@ export default function Home() {
             </ul>
             <button onClick={() => setBill({ ...bill, lines: [...bill.lines, { category: "other", description: "New charge", qty: 1, amount: 0 }] })} className="text-sm font-medium text-teal-800 underline">+ Add a line</button>
             <div className="flex items-center justify-between rounded-xl bg-white p-4 shadow-sm"><span className="font-medium">Total charges</span><span className="text-xl font-bold">{peso(total)}</span></div>
-            <button onClick={() => { setBill({ ...bill, total }); setStep(2); }} className="w-full rounded-xl bg-teal-700 px-5 py-4 text-lg font-semibold text-white hover:bg-teal-800">Looks right. Next: about you</button>
+            <button onClick={() => {
+              const det = detectFromBill(bill);
+              const merged: Detected = { ...bill.detected, ...Object.fromEntries(Object.entries(det).filter(([, v]) => v !== undefined)), notes: det.notes.length ? det.notes : bill.detected?.notes ?? [] };
+              setBill({ ...bill, total, detected: merged });
+              setAns({ hospitalType: merged.hospitalType, room: merged.room, setting: merged.setting, ...Object.fromEntries(Object.entries(ans).filter(([, v]) => v !== undefined)) });
+              setStep(2);
+            }} className="w-full rounded-xl bg-teal-700 px-5 py-4 text-lg font-semibold text-white hover:bg-teal-800">Looks right. Next: about you</button>
           </section>
         )}
 
         {step === 2 && bill && (
           <section className="space-y-6">
             <div><h2 className="text-2xl font-bold">Five quick questions</h2><p className="text-stone-600">Answers stay on your phone. They decide which programs apply.</p></div>
-            <Q label="1. What kind of hospital?" value={ans.hospitalType} on={(v) => setAns({ ...ans, hospitalType: v })} opts={[["doh", "DOH hospital", "Includes Heart Center, Lung Center, NKTI, PCMC"], ["lgu", "City / provincial (LGU)", ""], ["private", "Private hospital", ""]]} />
-            <Q label="2. What room is the patient in?" value={ans.room} on={(v) => setAns({ ...ans, room: v })} opts={[["ward", "Ward / basic", "Shared, no extra room charge"], ["private", "Semi-private or private", ""]]} />
-            <Q label="Admitted or outpatient?" value={ans.setting} on={(v) => setAns({ ...ans, setting: v })} opts={[["inpatient", "Admitted (confined)", ""], ["outpatient", "Outpatient", "Dialysis, chemo, check-ups"]]} />
+            <Q label="1. What kind of hospital?" hint={ans.hospitalType && ans.hospitalType === bill.detected?.hospitalType ? `Filled in from your bill (${bill.hospitalName}). Tap another answer if this is wrong.` : undefined} value={ans.hospitalType} on={(v) => setAns({ ...ans, hospitalType: v })} opts={[["doh", "DOH hospital", "Includes Heart Center, Lung Center, NKTI, PCMC"], ["lgu", "City / provincial (LGU)", ""], ["private", "Private hospital", ""]]} />
+            <Q label="2. What room is the patient in?" hint={ans.room && ans.room === bill.detected?.room ? "Filled in from the room line on your bill. Tap another answer if this is wrong." : undefined} value={ans.room} on={(v) => setAns({ ...ans, room: v })} opts={[["ward", "Ward / basic", "Shared, no extra room charge"], ["private", "Semi-private or private", ""]]} />
+            <Q label="Admitted or outpatient?" hint={ans.setting && ans.setting === bill.detected?.setting ? "Filled in because your bill has a room charge." : undefined} value={ans.setting} on={(v) => setAns({ ...ans, setting: v })} opts={[["inpatient", "Admitted (confined)", ""], ["outpatient", "Outpatient", "Dialysis, chemo, check-ups"]]} />
             <Q label="3. Is the patient an active PhilHealth member?" value={ans.philhealth} on={(v) => setAns({ ...ans, philhealth: v })} opts={[["active", "Yes, active", ""], ["none", "No / not sure", ""]]} />
             <Q label="4. Patient category" value={ans.category} on={(v) => setAns({ ...ans, category: v })} opts={[["none", "None of these", ""], ["senior", "Senior citizen (60+)", ""], ["pwd", "Person with disability", ""], ["minor", "Child under 18", ""]]} />
             <Q label="5. Household monthly income" value={ans.income} on={(v) => setAns({ ...ans, income: v })} opts={[["low", "Below ₱15,000", ""], ["middle", "₱15,000 to ₱40,000", ""], ["high", "Above ₱40,000", ""]]} />
@@ -258,10 +265,12 @@ export default function Home() {
   );
 }
 
-function Q<T extends string>({ label, value, on, opts }: { label: string; value?: T; on: (v: T) => void; opts: [T, string, string][] }) {
+function Q<T extends string>({ label, hint, value, on, opts }: { label: string; hint?: string; value?: T; on: (v: T) => void; opts: [T, string, string][] }) {
   return (
     <fieldset>
-      <legend className="mb-2 font-semibold">{label}</legend>
+      <legend className="mb-1 font-semibold">{label}</legend>
+      {hint && <p className="mb-2 text-sm font-medium text-teal-800">✓ {hint}</p>}
+      {!hint && <div className="mb-1" />}
       <div className="grid gap-2">
         {opts.map(([v, t, sub]) => (
           <button key={v} type="button" aria-pressed={value === v} onClick={() => on(v)}

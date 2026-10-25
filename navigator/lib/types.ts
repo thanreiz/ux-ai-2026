@@ -12,6 +12,8 @@ export interface Bill {
   hospitalName: string;
   lines: BillLine[];
   total: number;
+  hospitalGuess?: "doh" | "lgu" | "private"; // Decisions API guess, only when confident
+  detected?: { hospitalType?: Answers["hospitalType"]; room?: Answers["room"]; setting?: Answers["setting"]; notes: string[] };
 }
 
 export interface Answers {

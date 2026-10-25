@@ -19,6 +19,8 @@ export const SAMPLE_BILL: Bill = {
   hospitalName: "Sample General Hospital (fictional)",
   lines,
   total: lines.reduce((s, l) => s + l.amount, 0),
+  // Demo shortcut: pretend the hospital was recognised as a DOH hospital.
+  detected: { hospitalType: "doh", room: "ward", setting: "inpatient", notes: ["Sample hospital treated as a DOH hospital", 'room line says "Ward bed (5 nights)"'] },
 };
 
 // Cached explanations so the demo never needs a live call.

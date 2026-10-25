@@ -1,7 +1,8 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import type { Bill } from "@/lib/types";
-import { checkCategories } from "@/lib/decide";
+import { checkCategories, classifyHospital } from "@/lib/decide";
+import { detectFromBill, matchKnownHospital } from "@/lib/detect";
 
 export const maxDuration = 60;
 
@@ -78,8 +79,13 @@ export async function POST(req: Request) {
       try { const better = await read(ESCALATE_MODEL); if (!shaky(better) || better.lines.filter((l) => l.lowConfidence).length < bill.lines.filter((l) => l.lowConfidence).length) { bill = better; escalated = true; } } catch { /* keep first read */ }
     }
     // Decisions API second opinion on each line's category (drives the rules engine).
-    const d = await checkCategories(bill.lines).catch(() => null);
+    const [d, guess] = await Promise.all([
+      checkCategories(bill.lines).catch(() => null),
+      matchKnownHospital(bill.hospitalName) ? Promise.resolve(null) : classifyHospital(bill.hospitalName),
+    ]);
     if (d) bill = { ...bill, lines: d.lines };
+    if (guess) bill = { ...bill, hospitalGuess: guess };
+    bill = { ...bill, detected: detectFromBill(bill) };
     return NextResponse.json({ bill, escalated, decisions: d ? { checked: d.checked, changed: d.changed } : null });
   } catch (e) {
     console.error("extract failed", e instanceof Error ? e.message : e);
