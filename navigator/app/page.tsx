@@ -102,13 +102,18 @@ export default function Home() {
     try {
       const image = await shrink(f);
       const r = await fetch("/api/extract", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image }) });
+      if (r.status === 422) throw new Error("not_a_bill");
+      if (r.status === 429) throw new Error("rate_limited");
       if (!r.ok) throw new Error(String(r.status));
       const { bill: b } = (await r.json()) as { bill: Bill };
       if (!b.lines.length) throw new Error("empty");
       setBill(b); setExpl({}); setStep(1);
       explain(b);
-    } catch {
+    } catch (e) {
+      const code = e instanceof Error ? e.message : "";
       if (isSample) { useSample(); }
+      else if (code === "not_a_bill") setErr("This photo doesn’t look like a hospital bill. Take a photo of the Statement of Account (SOA) with the charges and the total.");
+      else if (code === "rate_limited") setErr("Too many photos in a short time. Please wait a minute and try again.");
       else setErr("We could not read that photo. Lay the bill flat in good light with every line in the frame, then try again. Or use the sample photo to see how it works.");
     } finally {
       clearInterval(timer); setBusy("");
@@ -238,7 +243,8 @@ export default function Home() {
               <button className="btn-primary" onClick={() => {
                 const det = detectFromBill(bill);
                 const merged: Detected = { ...bill.detected, ...Object.fromEntries(Object.entries(det).filter(([, v]) => v !== undefined)), notes: det.notes.length ? det.notes : bill.detected?.notes ?? [] };
-                setBill({ ...bill, total, detected: merged });
+                // Keep the total printed on the bill; the rules flag any gap between it and the lines.
+                setBill({ ...bill, total: stated > 0 ? stated : total, detected: merged });
                 setAns({ hospitalType: merged.hospitalType, room: merged.room, setting: merged.setting, philhealth: merged.philhealth, category: merged.category, ...Object.fromEntries(Object.entries(ans).filter(([, v]) => v !== undefined)) });
                 goStep(2);
               }}>Looks right · Continue</button>
@@ -292,7 +298,7 @@ export default function Home() {
 
             <div className="sticky-cta">
               {!complete && <p className="cta-hint">Answer the questions marked “Needs your answer” to continue.</p>}
-              <button className="btn-primary" disabled={!complete} onClick={() => goStep(3)}>{t("Show my plan", "Ipakita ang plano ko")}</button>
+              <button className="btn-primary" disabled={!complete} onClick={() => goStep(3)}>Show my plan</button>
             </div>
           </section>
         )}

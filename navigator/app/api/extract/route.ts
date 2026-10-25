@@ -83,6 +83,9 @@ export async function POST(req: Request) {
       escalationTried = true;
       try { const better = await read(ESCALATE_MODEL); if (!isShaky(better) || lowCount(better) < lowCount(bill)) { bill = better; escalated = true; } } catch { /* keep first read */ }
     }
+    // Nothing billable on the photo: stop before spending on category and hospital checks.
+    if (bill.lines.length === 0) return NextResponse.json({ error: "not_a_bill" }, { status: 422 });
+
     // Decisions API second opinion on each line's category (drives the rules engine).
     const [d, guess] = await Promise.all([
       checkCategories(bill.lines).catch(() => null),
