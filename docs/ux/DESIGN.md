@@ -1,4 +1,4 @@
-# BayadGabay UX design
+# Akop UX design
 
 **Audience:** a family member at a hospital billing window, often using a phone while stressed. **Primary viewport:** 375 × 812 CSS px; must work from 360px up. **Task target:** get to a useful first action in under five minutes. **Date:** 25 October 2026.
 
@@ -70,7 +70,7 @@ Mobile order: top back/header → title and short instruction → camera primary
 
 ```text
 ┌──────────────────────────────┐
-│ BayadGabay        1 of 4     │
+│ Akop              1 of 4     │
 │ Start with a photo           │
 │ [ Take a photo        56px ] │
 │ [ Choose from phone   52px ] │

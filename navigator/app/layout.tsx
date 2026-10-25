@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BayadGabay - Hospital bill and aid navigator",
+  title: "Akop - Hospital bill and aid guide",
   description: "Photo of your hospital bill in, a step-by-step plan for PhilHealth, ZBB and medical aid out.",
 };
 
